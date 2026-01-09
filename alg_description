@@ -1,0 +1,793 @@
+\documentclass{IEEEtran}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{acronym}
+\usepackage{float}
+\usepackage{cite}
+\usepackage{multicol}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage[utf8]{inputenc}
+\usepackage{lineno}
+\usepackage{url}
+\usepackage{comment}
+\usepackage{paralist}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{float}
+\usepackage[ruled,vlined,linesnumbered,noresetcount]{algorithm2e}
+\usepackage[shortlabels]{enumitem} % <---
+
+
+\newcommand{\dlr}[1]{\textcolor{red}{{#1}}}
+\newcommand{\sid}[1]{\textcolor{red}{{#1}}}
+\newcommand{\lb}[1]{\textcolor{purple}{{\bf #1}}}
+\newcommand{\eg}{\textit{e.g.}}
+\newcommand{\ie}{\textit{i.e.}}
+\newcommand{\et}{\textit{et al.}}
+
+\input{acro}
+
+\linespread{0.97}
+
+\title{Federated Learning Framework to Enhance Efficiency and Robustness in Vehicular Scenarios}
+
+\author{
+\IEEEauthorblockN{
+    Lucas Pacheco\IEEEauthorrefmark{1}\IEEEauthorrefmark{2},
+    Torsten Braun\IEEEauthorrefmark{2},
+    Denis Ros\'ario\IEEEauthorrefmark{1}, and
+    Eduardo Cerqueira\IEEEauthorrefmark{1}
+}\\
+\IEEEauthorblockA{\IEEEauthorrefmark{1}
+Federal University of Par\'a, Brazil \\
+\IEEEauthorblockA{\IEEEauthorrefmark{2}
+Institute of Computer Science, University of Bern, Switzerland \\
+}
+Emails: \{lucas.pacheco, torsten.braun\}@unibe.ch,
+\{denis, cerqueira\}@ufpa.br, 
+} }
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+
+Vehicular Federated Learning (VFL) emerged as a pivotal distributed machine learning paradigm, enabling the preservation of data privacy and reducing communication overhead. However, VFL faces unique challenges due to client heterogeneity, dynamic network topology, and limited communication bandwidth.
+In this article, we propose the Federated Learning with Importance-driven Pruning and Selection (FLIPS) framework.
+\alg{} introduces selective layer pruning guided by SHapley Additive exPlanations (SHAP) to preserve essential model components while reducing communication costs.
+FLIPS' multifactor client selection mechanism prioritizes participants based on communication quality, mobility, computational resources, and local data relevance, enhancing training efficiency.
+We also introduce an importance-weighted aggregation at the server further improving model performance by prioritizing the aggregation of the most important model weights.
+Evaluation over CIFAR-100 demonstrate that \alg{} achieves superior accuracy, faster convergence, and reduced communication overhead compared to baseline methods.
+These results underscore the efficacy of \alg{} in dynamic and resource-constrained vehicular environments, paving the way for robust and scalable for VFL.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Model Pruning, Client Selection, SHAP, and Communication Efficiency.
+\end{IEEEkeywords}
+
+\section{Introduction}
+\label{sec:introduction}
+
+\ac{FL} offers a promising alternative to enable a large set of applications ranging from predictive traffic management to autonomous driving, since \ac{FL} offers  collaborative \ac{ML} training through localized updates rather than raw data exchange. Despite its potential, deploying \ac{VFL} introduces unique challenges that existing \ac{FL} frameworks fail to address holistically \cite{pokhrel2020federated}. This is because \ac{VFL} environments are inherently dynamic and mobile, where vehicles exhibit  heterogeneity in computational resources, data distributions, and connectivity patterns.
+Hence, conventional \ac{FL} struggles to maintain model accuracy and communication efficiency under these conditions, leading to unstable convergence or unsafe predictions in safety-critical \ac{VFL} scenarios.
+
+In dynamic and heterogeneous \ac{VFL} environments, training a complete ML model is challenging due to mobility constraints and intermittent connectivity \cite{razmi2024board}. In this way,  model compression techniques are crucial for minimizing communication overhead and optimizing model transmission, ensuring better adaptation to \ac{VFL} scenarios while preserving critical model accuracy \cite{zhang2024distributed}. Current approaches prioritize isolated optimizations, leaving critical gaps unaddressed. Early studies, such as those optimizing latency in reliable vehicular communications, validate FL’s feasibility but simplify client dynamics and resource constraints, such as gradient quantization and sparsification, effectively reduce bandwidth consumption \cite{Zhang2024}. However, they typically apply uniform compression rates across all model layers, overlooking the varying significance of parameters in complex tasks such as pedestrian detection \cite{konevcny2016federated}. In contrast, non-uniform compression guided by \ac{XAI}  techniques, such as \ac{SHAP}, identifies and preserves high-impact parameters, ensuring that compression targets less critical components while maintaining model accuracy and interpretability \cite{DUBEY2025100697}.
+
+Efficient client selection is essential for \ac{VFL}, requiring the consideration of vehicular-specific factors when determining which vehicles should participate in the federation \cite{nishio2019client,yang2021achieving}. For instance, transient connectivity, mobility, and data relevance influence model performance and training stability in dynamic vehicular environments. While \ac{XAI} approaches can enhance the model transmission, intelligent client selection ensures that high-impact vehicles contribute more effectively to the global model. However, existing approaches often fail to holistically integrate communication efficiency, client reliability, mobility-awareness and model interpretability, resulting in suboptimal trade-offs between accuracy, overhead, and convergence time in dynamic vehicular networks.
+
+To address these challenges, we introduce \alg{}, a \ac{FL} framework that integrates adaptive model compression, intelligent client selection, and explainability-driven aggregation algorithms to enhance efficiency and robustness in \ac{VFL} scenarios. 
+Specifically, \alg{} leverages SHAP-derived importance scores to implement non-uniform layer pruning, selectively compressing less impactful parameters while preserving critical ones. 
+\alg{} also introduces an intelligent client selection mechanism that dynamically evaluates computational resources, mobility, real-time connectivity metrics, and data relevance. 
+Finally, \alg{} leverages layer-wise importance scores to weight global model updates, ensuring that the most influential vehicles and parameters contribute more significantly to the learning process. Simulation results using NS-3 validate our approach, showing that \alg{} reduces communication overhead by 48\% compared to FedAvg while improving accuracy by 14\% over FedProx in mobile scenarios, setting a new state-of-the-art for vehicular federated learning.
+
+To address key challenges in VFL, this article discusses the following research questions:
+\begin{inparaenum}[i)]
+    \item  How can SHAP-guided selective layer pruning reduce communication overhead while preserving essential model components in dynamic environments? 
+    \item  How a multi-criteria client selection approach (e.g., connectivity, mobility, computational resources, and data relevance) optimizes training efficiency and robustness in heterogeneous VFL scenarios?
+    \item  How can importance-weighted aggregation based on SHAP scores enhance global model performance over traditional federated averaging?
+    \item Can a unified framework combining adaptive pruning, multifactor client selection, and explainability-driven aggregation achieve faster convergence and higher accuracy in resource-constrained VFL settings? The FLIPS framework addresses these questions by using SHAP-based pruning to prioritize key layers, context-aware client selection to minimize dropouts, and weighted aggregation to emphasize impactful updates, thereby balancing communication efficiency and model robustness.
+\end{inparaenum}
+
+
+The remainder of this paper is organized as follows: Section~\ref{sec:related_work} reviews related works. Sections~\ref{sec:system_model} and~\ref{sec:algorithm} detail the system model and \alg{}’s design. Section~\ref{sec:experiments} presents experimental results, and Section~\ref{sec:conclusion} concludes.
+
+\section{Related Work}
+\label{sec:related_work}
+
+Reducing communication overhead is critical in \ac{VFL}, particularly in mobile scenarios. Current works introduced compression techniques, such as quantized gradient exchanges and sparsification, to enhance model transmission. In our previous work \cite{10503481}, we proposed DrivePFL, a FL approach that selectively transmits only the most critical model layers based on mobility predictions. While DrivePFL improved communication efficiency and model convergence, challenges in explainability-driven aggregation and client selection under dynamic conditions remained.
+
+Lee \et{} \cite{Lee_Zhang_Avestimehr_2023} introduced FedLAMA, a FL proposal that adjusts the aggregation interval on a layer-wise basis, considering model discrepancy and communication cost. This approach effectively reduces communication overhead while maintaining model accuracy. However, to enhance FedLAMA’s efficiency in dynamic and non-iid vehicle environments, further advancements are needed, including explainability-driven pruning schemes.
+
+Konečný \et{} \cite{konevcny2016federated} demonstrated how structured and sketched updates reduce uplink costs, while Sattler \et{} \cite{sattler2019robust} explored sparse ternary compression. However, despite their effectiveness in \ac{FL} environments, these methods typically apply uniform compression across all model layers, assuming equal importance. In \ac{VFL}, where latency and reliability constraints are more severe, uniform compression can over-compress crucial layers, leading to suboptimal performance and accuracy degradation.
+
+Efficient client selection remains a fundamental challenge in \ac{VFL}, as suboptimal choices can compromise both training convergence and communication efficiency. FedCS \cite{nishio2019client} selects participants based on resource constraints and attempts to increase the number of active clients each round.
+Yang \et{} \cite{yang2021achieving} incorporated energy constraints into the selection mechanism, thereby improving sustainability in mobile \ac{FL}.
+However, these approaches do not consider key factors to \ac{VFL} settings, including mobility and data relevance. Consequently, dropout rates and communication overhead can remain high if vehicles with poor connectivity or minimal relevant data are routinely selected.
+
+The SHapley Additive exPlanations (SHAP) method, introduced by Lundberg and Lee~\cite{lundberg2017unified}, provides a game-theoretic approach to interpret machine learning model predictions by assigning importance values to individual features. SHAP quantifies each feature's contribution to the difference between a model's prediction and a baseline expectation.
+In FL, SHAP's ability to identify critical parameters can be leveraged to optimize communication and computation.
+The usage of SHAP in FL can enable efficient, explainability-driven aggregation by weighting updates based on their inferred impact, fostering robust collaboration in distributed settings.
+
+The Federated Learning of Explainable AI (FED-XAI) framework is designed to preserve privacy during the collaborative training of AI models in secure VFL scenarios \cite{info13080395, Fed-XAI}. In addition to ensuring privacy, FED-XAI enhances the explainability of both individual models and the aggregated global model resulting from FL. The main objective of FED-XAI is to predict the Quality of Experience (QoE) perceived by vehicles and enhance video data transmission in VFL environments. Similarly, the FLaaS framework introduces flexible mechanisms for B5G/6G networks, enabling end users to leverage FL services \cite{CORCUERABARCENA2023356}. Additionally, FLaaS presents a QoE-forecasting application based on a vehicular networking use case. However, both FED-XAI and FLaaS do not incorporate model compression, client selection, or mechanisms for fast convergence in resource-constrained VFL settings.
+
+The integration of XAI and FL aims to enhance the effectiveness and trustworthiness of trajectory decisions for newcomer Autonomous Vehicles (AVs) \cite{9824617}. When a newcomer vehicle requests assistance with trajectory planning, the edge server initiates a federated learning process to train a distributed, collaborative model for trajectory and velocity prediction. XAI is then used to quantify the contribution of each feature provided by participating vehicles to the overall system. However, the proposed scheme lacks efficiency in terms of communication overhead and model transmission optimization.
+
+In contrast, FLIPS specifically harnesses importance measure - similar to those used in XAI methods (e.g., SHAP-like indicators identifying the most critical parameters or layers) - to guide the pruning process. Rather than focusing on human-interpretable explanations, FLIPS systematically computes a layer-level importance score to determine which model segments are essential to retain. This explainability-driven approach ensures that model pruning and aggregation prioritize parameters with the highest impact on performance, effectively balancing communication efficiency with minimal accuracy loss. Unlike studies that solely emphasize interpretability, FLIPS repurposes these importance scores to actively optimize the \ac{FL} pipeline, enabling more efficient federation in resource-constrained vehicular networks.
+
+Based on the state-of-the-art analysis, we conclude that the existing \ac{VFL} literature offers significant contributions in areas such as latency optimization, compression, client selection, and interpretability. However, existing approaches fail to holistically integrate communication efficiency, client reliability, and model interpretability, leading to suboptimal trade-offs between accuracy, overhead, and scalability in dynamic vehicular networks.
+To the best of our knowledge, most approaches tackle these issues independently, failing to unify them under a single, cohesive strategy for \ac{VFL} environment.
+
+
+
+\section{System Model}
+\label{sec:system_model}
+
+The system consists of a set of vehicles $\mathcal{V} = \{1, 2, \dots, V\}$, a set of base stations $\mathcal{B} = \{1, 2, \dots, B\}$, and a central \ac{FL} server. 
+In this scenario, vehicles are equipped with wireless antennas, such as, \ac{mmWave}, to enable high-speed data transmission with \ac{mmWave} base stations.
+The communication link between vehicle $v$ and base station $b$ has a data rate $R_{v,b}$, which is influenced by channel conditions, bandwidth, and transmission power factors.
+Total communication delay $T_{\text{comm}}$ is a function of the data rates and model size updates.
+
+Each vehicle $v \in \mathcal{V}$  maintains its private local dataset $\mathcal{D}_v = \{(x_i^v, y_i^v)\}_{i=1}^{N_v}$, where $x_i^v$ represents the input features and $y_i^v$ the corresponding labels, while the local dataset size is denoted as $N_v = |\mathcal{D}_v|$.
+The local dataset $\mathcal{D}_v$ significantly varies in size, feature distribution, and label distribution, typically showing non-\ac{IID} characteristics.
+Furthermore, each vehicle $v$ is equipped with an \ac{OBU} capable of performing local computations required for training \ac{ML} model $\mathbf{w}_v$ with \( L \) layers denoted as $\mathcal{L} = \{l_1,l_2,\dots,l_L\}$.
+
+At the beginning of each communication round $t$, the central server broadcasts the current global model parameters $\mathbf{w}^{(t)}$ to all participating clients.
+Each vehicle $v$ trains a local model $\mathbf{w}_v$ by minimizing its loss function $L_{v}(\mathbf{w})$ over its dataset $\mathcal{D}_v$ using a specified number of epochs $E$. The model parameters are updated iteratively through \ac{SGD} with a learning rate $\eta$, as defined in Eq. \ref{eq:sgd}.
+
+\begin{equation}
+    \mathbf{w}_k^{(t)} = \mathbf{w}^{(t)} - \eta \nabla L_k(\mathbf{w}^{(t)}),
+    \label{eq:sgd}
+\end{equation}
+
+The local train aims to minimize the local loss function $\ell(\mathbf{w}; x_i, y_i)$ on a single data sample $(x_i, y_i)$, as shown in Eq. \ref{eq:local_loss}.
+The loss function $L_v(\mathbf{w})$ is defined as the average loss, as the prediction error, across all predictions for the dataset $\mathcal{D}_v$ using the model weights $W$.
+
+\begin{equation}
+L_{v}(\mathbf{w})
+=\frac{1}{N_v}
+  \sum_{i=1}^{N_v}
+  \ell\bigl(\mathbf{w};\,x_i^{v},\,y_i^{v}\bigr),
+\label{eq:local_loss}
+\end{equation}
+
+Afterwards, clients report their local model updates, and the central server orchestrates the \ac{VFL} process by aggregating local model updates from the vehicles, and also maintains a global model with parameters $\mathbf{w}$.
+The central server relies on an aggregation function, such as \ac{FedAvg}, to update the global model based on the received local models. This process iterates over multiple communication rounds until convergence. 
+
+\section{\alg{} Framework}
+\label{sec:algorithm}
+
+In this section, we present a VFL framework for dynamic and mobile environments that integrates adaptive model compression, client selection, and explainability-driven aggregation algorithms, called as \alg{}. Specifically, we propose an adaptive client selection algorithm that considers communication quality, mobility, computational capacity, and data volume to select clients for the FL training process, thereby improving the efficiency of model aggregation \cite{nishio2019client}. \alg{} also supports a layer-wise model pruning to mitigate computational and communication overheads, where
+layers of higher importance, identified through SHAP-based analysis, undergo less pruning to retain essential features. Finally, \alg{} combines model updates with quantization and pruning techniques, significantly reducing the transmitted data volume and enhancing communication efficiency in VFL mobile environments. We refine the aggregation process further through SHAP-enhanced aggregation, which uses importance-weighted model updates derived from SHAP values~\cite{lundberg2017unified}. Figure~\ref{fig:system_model} illustrates the main components of \alg{} under a \ac{VFL} scenario.
+
+\begin{figure*}[!htb]
+    \centering
+    \includegraphics[width=\linewidth]{figures/bigpicture.pdf}
+    \caption{Main Components of the \alg{} Algorithm}
+    \label{fig:system_model}
+\end{figure*}
+
+\subsection{Problem definition}
+
+% \sid{TEMOS QUE COLOCAR AO LONGO DAS SUB-SECS A IMPORTÂNCIA DE PREDIÇÃO DE MOBILIDADE E DIREÇÃO.}
+
+The \alg{} framework aims to address the challenges inherent in dynamic and resource-constrained \ac{VFL} environments, where clients exhibit varying computational capacities/connectivity and data distributions. For instance, dropout rates and communication overhead can remain high if vehicles with poor connectivity or minimal relevant data are routinely selected.
+
+Furthermore, in \ac{VFL}, client vehicles are inherently mobile, leading to dynamic network topologies and intermittent connectivity. Predicting mobility patterns and direction is critical to ensure stable participation in the federation. Vehicles with unpredictable trajectories or short contact times with base stations risk abrupt disconnections, causing incomplete model updates and wasted resources. For instance, a vehicle moving away from the network coverage area may fail to transmit its updates, while another approaching a cluster of base stations could offer prolonged connectivity. By integrating mobility prediction into client selection, \alg{} prioritizes vehicles with stable trajectories and sufficient contact time, minimizing dropout rates and maximizing reliable contributions. Furthermore, anticipating directional changes allows proactive resource allocation, ensuring timely model exchanges before clients exit the coverage zone. This approach enhances training efficiency and robustness in highly dynamic vehicular environments, where traditional \ac{FL} frameworks struggle with transient participants.
+
+We define a vehicle-specific weight \(\zeta_{v} = I_{v} \, N_{v} \cdot \tau_{v,b}\) to capture dataset size, SHAP-based importance, and predicted contact time, where \(I_{v}\) aggregates per-layer importance scores and \(\tau_{v,b}\) is the predicted contact time between vehicle \(v\) and base station \(b\). Hence, \alg{}'s objective function in round \(t\) is defined in Eq.~\ref{eq:objective}.
+
+\begin{equation}
+\min_{\mathbf{w}}
+L_{\mathrm{FLIPS}}(\mathbf{w})
+=
+\sum_{v \,\in\, \mathcal{S}_t}
+\zeta_{v}\;
+L_{v}(\mathbf{w}).
+\label{eq:objective}
+\end{equation}
+
+
+Vehicles with stronger link quality, larger datasets, and stable connectivity (higher \(\tau_{v,b}\)) receive higher influence. After local training, each vehicle prunes its updated parameters according to SHAP-derived layer importance, and then uploads the pruned model \(\tilde{\mathbf{w}}_{v}^{(t)}\) to the server. The global model update for layer \(l\) is computed based on Eq. \ref{eq:global}.
+
+\begin{equation}
+\mathbf{w}^{l,(t+1)}
+=
+\frac{\displaystyle
+      \sum_{v \,\in\, \mathcal{S}_t}
+      \zeta_{v}\,
+      \tilde{\mathbf{w}}_{v}^{l,(t)}
+     }
+     {\displaystyle
+      \sum_{v \,\in\, \mathcal{S}_t}
+      \zeta_{v}
+     }.
+\label{eq:global}
+\end{equation}
+
+\alg{} ensures that valuable updates are aggregated reliably by emphasizing vehicles with stable links, high SHAP importance, and prolonged connectivity. In this sense, \alg{} adapts to vehicular conditions by reducing the impact of poor connectivity and prioritizing parameters critical to the global model, ultimately finding while respecting communication constraints such as limited coverage and frequent handovers, as denoted in Eq. \ref{eq:flips}.
+
+\begin{equation}
+\mathbf{w}^{*}
+=
+\arg\min_{\mathbf{w}}
+L_{\mathrm{FLIPS}}(\mathbf{w})
+\label{eq:flips}
+\end{equation}
+
+\subsection{Layer Importance Evaluation Using \ac{SHAP}}
+\label{sec:shap_evaluation}
+
+After local training, each client $k$ assesses the significance of individual model layers using the \ac{SHAP} algorithm~\cite{lundberg2017unified}. 
+Unlike standard feature-based explanations, we treat entire layers as ``features,'' computing how each layer contributes to model performance for given local data. 
+This evaluation is essential not only for adaptive model pruning but also for importance-weighted model aggregation. 
+
+Deep SHAP computes \cite{bialek2022dataset} layer-level SHAP values by interpreting each layer as a ``player'' in a cooperative game.
+For a model with layers $\mathcal{L} = \{1,2,\dots,L\}$, the SHAP value $\phi_k^l(x_i)$ for layer $l$ at client $k$ and sample $x_i$ captures the contribution of layer $l$ to the deviation of the model's output from a baseline prediction, which is formally defined on Eq. \ref{eq:baseline_shap}. We denote $S$ as any subset of layers excluding layer $l$, and $f_S(\cdot)$ denotes the model's output when only layers in $S$ are active.
+
+\begin{equation}
+\phi_k^l(x_i) 
+= \sum_{S \subseteq \mathcal{L} \setminus \{l\}} 
+\frac{|S|!(|\mathcal{L}| - |S| - 1)!}{|\mathcal{L}|!}
+\Bigl[ 
+    f_S(x_i) - f_{S \cup \{l\}}(x_i) 
+\Bigr],
+\label{eq:baseline_shap}
+\end{equation}
+
+We obtain a SHAP-based importance score $I_k^l$ by averaging over a local validation set $\mathcal{D}_k^{\mathrm{val}}$, as defined in Eq. \ref{eq:layer_shap_score}.
+In this sense, higher magnitudes of $I_k^l$ imply that layer $l$ plays a more crucial role in the client's local model predictions.
+
+\begin{equation}
+I_k^l 
+= \frac{1}{|\mathcal{D}_k^{\mathrm{val}}|}
+  \sum_{(x_i, y_i)\in \mathcal{D}_k^{\mathrm{val}}}
+  \bigl|\phi_k^l(x_i)\bigr|.
+\label{eq:layer_shap_score}
+\end{equation}
+
+Directly recomputing \ac{SHAP} values every round can be prohibitively expensive.
+Moreover, vehicular conditions (\eg, frequent handovers, variable link quality) cause a single client's updates to become stale or arrive late. To address these issues, we propose an \emph{incremental} and \emph{context-aware} extension to Deep SHAP, ensuring the final importance scores integrate both network reliability and model changes over time.
+
+Let $\mathbf{w}_{\text{base}}^{(t)}$ denote the lightweight ``baseline'' model maintained by the server (\eg, an exponentially-smoothed version of the previous global model). Each vehicle $k$ computes a \emph{delta} vector to reflect the changes since the last baseline, as shown in Eq. \ref{eq:lightweight}
+
+\begin{equation}
+\Delta \mathbf{w}^{(t)} 
+= \mathbf{w}^{(t)} 
+  - \mathbf{w}_{\text{base}}^{(t)},
+\label{eq:lightweight}
+\end{equation}
+
+In this context, each vehicle incrementally adjusts its previous round's SHAP values $\phi_k^l(x_i)$ by measuring how $\Delta \mathbf{w}^{(t)}$ influences local predictions $\Delta \phi_k^l(x_i)$. The local predictions $\Delta \phi_k^l(x_i)$ are computed based on Eq. \ref{eq:local}.
+
+\begin{equation}
+\Delta \phi_k^l(x_i) 
+= \mathrm{SHAP}\bigl(
+   \mathbf{w}_{\text{base}}^{(t)},\, 
+   \Delta \mathbf{w}^{(t)},\, 
+   x_i,\, 
+   l
+  \bigr).
+  \label{eq:local}
+\end{equation}
+
+The local SHAP value is updated based on Eq. \ref{eq:SHAP}, where clients need only evaluate the \emph{incremental contribution} of newly updated layers, drastically reducing computational overhead while preserving the interpretability benefits of SHAP.
+
+\begin{equation}
+\phi_k^l(x_i) 
+\;\leftarrow\; \phi_k^l(x_i) + \Delta \phi_k^l(x_i).
+\label{eq:SHAP}
+\end{equation}
+
+We introduce a context factor $\omega_k \in (0,1]$ for each vehicle $k$ to further mitigate the risk of stale or partially transmitted updates. This factor downscales importance scores $I_k^l$ when the vehicle suffers adverse conditions (\eg, low $\mathrm{RSSI}$, repeated timeouts), as defined on Eq. \ref{eq:contextualized_score}.
+
+\begin{equation}
+I_k^l 
+= \omega_k 
+  \times \frac{1}{|\mathcal{D}_k^{\mathrm{val}}|}
+  \sum_{(x_i, y_i)\in \mathcal{D}_k^{\mathrm{val}}} 
+  \bigl|\phi_k^l(x_i)\bigr|.
+\label{eq:contextualized_score}
+\end{equation}
+
+For instance, we define $\omega_k$ as a measure capturing link quality, reliability, and predicted mobility, as shown in Eq.~\ref{eq:omega}. Here, $\mathrm{RSSI}_k^{\mathrm{norm}}$ is a normalized measure of signal strength, $\mathrm{dropout}_k$ accumulates recent communication failures, and $\tilde{\tau}_{k,b}$ represents the predicted contact time. Coefficients $\gamma_1$, $\gamma_2$, and $\gamma_3$ weight the importance of link quality, reliability, and mobility prediction, respectively.
+
+\begin{equation}
+\omega_k 
+= \min\Bigl\{1,\,
+   \gamma_1\,\mathrm{RSSI}_k^{\mathrm{norm}}
+   + \gamma_2\,\frac{1}{1 + \mathrm{dropout}_k} 
+      + \gamma_3\,\tilde{\tau}_{k,b}
+  \Bigr\},
+  \label{eq:omega}
+\end{equation}
+
+The final importance score $I_k^l$ drives the selective layer pruning and server-side aggregation. For instance, layers with smaller $I_k^l$ receive higher pruning thresholds, cutting more weights to reduce communication overhead. In this sense, critical layers are preserved even in constrained \ac{VFL} environments.
+We denote $\tilde{\mathbf{w}}_k^{l,(t)}$ as the pruned weights from client $k$, which is defined on Eq. \ref{Eq:prune}. Hence, vehicles with higher layer importance and stable network conditions shape the global model more strongly, enhancing robustness against partially delivered or outdated updates.
+    
+\begin{equation}
+    \mathbf{w}^{l,(t+1)} 
+    = \frac{\sum_{k=1}^K \Bigl(I_k^l\,N_k\Bigr) \,\tilde{\mathbf{w}}_k^{l,(t)}}
+           {\sum_{k=1}^K I_k^l\,N_k},
+    \label{Eq:prune}
+\end{equation}
+
+\subsection{Explainability Analysis}
+\label{sec:explainability}
+
+To quantify the contribution of individual model layers to prediction accuracy, SHAP values were computed for each layer across clients. Layer-level SHAP scores were derived by interpreting each layer as a cooperative player in the model’s prediction process, with contributions measured as deviations from a baseline output. The magnitude of SHAP values, averaged over local validation datasets, identified layers critical to maintaining model performance. For example, convolutional layers processing spatial features exhibited higher importance scores compared to fully connected layers, reflecting their role in extracting vehicular-relevant patterns such as motion trajectories or sensor data. 
+
+Figure~\ref{fig:shap_layers} shows SHAP values across model layers to quantify layer contributions, where convolutional layers processing raw sensor inputs show highest importance.
+Results demonstrate that initial convolutional layers (Conv1-3) exhibit higher importance scores for processing raw sensor inputs, while later layers show reduced impact. 
+Figure \ref{fig:shap_heatmap} reveals temporal consistency in layer importance rankings across communication rounds, with GPS-processing layers maintaining stable high values.
+Results revels that GPS-processing layers (L3-L5) maintain consistent high importance.
+
+
+% The dynamic adaptation of pruning thresholds is shown in 
+% Figure~\ref{fig:threshold_adapt}, where velocity-related layers receive lower pruning rates despite network fluctuations. Analysis of layer-wise SHAP distributions (Figure~\ref{fig:violin_plot}) confirms that spatial feature extractors exhibit lower variance in importance scores compared to task-specific classification layers.
+
+\begin{figure}[!htb]
+    \centering
+    \includegraphics[width=\linewidth]{figures/shap_layer_importance.pdf}
+    \caption{Layer-wise SHAP values averaged across clients and communication rounds.}
+    \label{fig:shap_layers}
+\end{figure}
+
+\begin{figure}[!htb]
+    \centering
+    \includegraphics[width=0.45\textwidth]{results/shap_temporal_heatmap.pdf}
+    \caption{Heatmap of SHAP values across communication rounds. }
+    \label{fig:shap_heatmap}
+\end{figure}
+
+\subsection{Client Reporting}
+
+After local training, each client $k \in \mathcal{K}$ gathers a set of metrics, such as, \ac{RSSI}, Local Validation Accuracy, Layer Importance Scores, Dataset Size, Training Time, Predicted Contact Time, for decision-making at the central server. In this sense, clients report their local model updates along with metadata about such information.
+Specifically, the \ac{RSSI} captures the communication link quality between the client and its nearest base station. 
+Local Validation Accuracy ($A_k$) means the client’s locally trained model on a validation dataset $\mathcal{D}_k^{\text{val}}$, providing a performance indicator under the client’s potentially non-IID data distribution, as shown in Eq. \ref{eq:ak}. We denote $\hat{y}_i$ as the model’s prediction for the sample $x_i$, and $\mathbf{1}(\cdot)$ as an indicator function.
+
+\begin{equation}
+    A_k = \frac{1}{|\mathcal{D}_k^{\text{val}}|} \sum_{(x_i, y_i) \in \mathcal{D}_k^{\text{val}}} \mathbf{1}( \hat{y}_i = y_i )
+    \label{eq:ak}
+\end{equation}
+    
+
+The Layer Importance Scores ($\mathbf{I}_k = \{I_k^l\}_{l=1}^L$) computed via \ac{SHAP}, reflect the relative contribution of each layer to the model’s overall predictions, assisting the model pruning process.
+The Dataset Size ($N_v$) indicates the number of samples in the local training dataset $\mathcal{D}_v$, providing insight into the scale of non-IID data held by the client. Training Time ($T_k$) means the duration for which the client trains its local model over $E$ epochs.
+
+   
+
+Once collected, each metric undergoes normalization to facilitate consistent model aggregation decisions and to ensure that reporting remains lightweight, improving communication efficiency. For instance, we normalize the \ac{RSSI} following Eq. \ref{eq:rssi}. We denote $\text{RSSI}_{\min}$ and $\text{RSSI}_{\max}$ as the minimum and maximum signal strengths among all clients, respectively.
+
+\begin{equation}
+    \text{RSSI}_k^{\text{norm}} = \frac{\text{RSSI}_k - \text{RSSI}_{\min}}{\text{RSSI}_{\max} - \text{RSSI}_{\min}},
+    \label{eq:rssi}
+\end{equation}
+
+In addition, \ac{SHAP}-based importance values are normalized within each client to standardize the scale of layer relevancy, following Eq.  \ref{eq:shapnormalized}. We denote $\mathcal{L}$ as the set of all layers.
+
+\begin{equation}
+    I_k^l \leftarrow \frac{I_k^l}{\max_{l' \in \mathcal{L}} I_k^{l'}},
+    \label{eq:shapnormalized}
+\end{equation}
+
+Furthermore, each client’s training time is normalized by the maximum training time across all clients to ensure uniformity of comparison, similarly to \ac{RSSI} normalization. Following the normalization, the metrics are bundled into a 5-tuple, denoted on Eq. \ref{eq:tuple}. The 5-tuple must be serialized (\eg, using \ac{JSON} or Protocol Buffers) and transmitted to the central server. This data-driven reporting approach underpins the Client Selection, Model Pruning, and Model Aggregation steps in \ac{VFL}.
+
+
+\begin{equation}
+\text{Client\_data}_k = (\text{RSSI}_k, A_k, \mathbf{I}_k, N_k, \widetilde{\tau}_{k,b}),
+\label{eq:tuple}
+\end{equation}
+
+\subsection{Client Selection}
+
+The client selection mechanism is responsible for determining specific subsets of vehicles eligible to participate in the upcoming learning rounds.
+However, the mechanism must guarantee that the participating clients have valuable samples, which reduces the waste of computational resources by removing the learning whose data are no longer critical for the global model training.
+
+In this context, upon receiving the clients’ reports, the server proceeds with client selection to balance high-quality updates, reliable communication links, and efficient computation in the presence of potentially non-IID data. First, each client must meet a minimum \ac{RSSI} requirement:
+
+\begin{equation}
+\text{RSSI}_k \geq \text{RSSI}_{\text{min}}.
+\end{equation}
+
+For every client that satisfies the minimum RSSI requirement, a selection score \(S_k\) is calculated based on Eq. \ref{eq:score}. We denote \(\tilde{A}_k\) as the normalized local validation accuracy, \(\tilde{N}_k\) represents the normalized dataset size, \(\tilde{T}_k^{-1}\) is the normalized inverse training time, \(\tilde{D}_k\) is the normalized device density around client \(k\), and \(\tilde{\tau}_{k,b}\) is the normalized predicted contact time with base station \(b\). The weighting coefficients \(\beta_i\) are constrained by \(\sum_{i=1}^{5}\beta_i=1\), and we conducted a grid search over the feasible parameter space for the \(\beta_i\) values in preliminary experiments. This helps to identify a configuration that balances the trade-offs among model accuracy, communication overhead, and convergence speed.
+
+\begin{equation}
+S_k = \beta_1\,\tilde{A}_k + \beta_2\,\tilde{N}_k + \beta_3\,\tilde{T}_k^{-1}  + \beta_4\,(1 - \tilde{D}_k) + \beta_5\,\tilde{\tau}_{k,b}
+\label{eq:score}
+\end{equation}
+
+In this sense, the server ranks all eligible clients based on the selection score $S_k$, and selects the top $K$ for the current FL round. At each new communication round, we repeat this client selection process.
+
+\subsection{Model Compression and Quantization}
+
+The selected clients receive the global model to perform local training, and these clients employ dual compression strategies prior to model transmission, namely parameter quantization and importance-aware model pruning. These methods reduce communication overhead while maintaining critical model information.
+Importance-aware pruning uses SHAP-based layer importance scores to compute thresholds and eliminate weights. 
+
+The threshold depends on SHAP importance but does not adapt to mobility. Clients predicted to disconnect soon might prune aggressively, losing critical updates. To address this, we adjust $\theta_{\text{base}}$ dynamically based on $\tau_{v,b}$. For a given layer $l$ with importance score $I_k^l$, the layer-specific threshold is defined based on Eq. \ref{eq:threshold}. We denote $I_k^{\text{max}}$ as the maximum importance score across layers, and $\widetilde{\tau}_{v,b}$ as the normalized predicted contact time between vehicle $v$ and base station $b$ from Section 4.6. The base threshold $\theta_{\text{base}}(v)$ is adjusted as:
+
+\begin{equation}
+\theta_{\text{base}}(v) = \theta_{\text{base}} \cdot \left(1 + \alpha \cdot \widetilde{\tau}_{v,b}\right),
+\end{equation}
+
+where $\alpha$ scales the impact of predicted contact time on pruning. Consequently, the layer-specific threshold becomes:
+
+\begin{equation}
+\theta_k^l = \theta_{\text{base}}(v) \left(1 - \frac{I_k^l}{I_k^{\text{max}}}\right)
+\label{eq:threshold}
+\end{equation}
+
+Afterwards, the weight $w_{k,i}^l$ in layer $l$ is set to zero if:
+
+\begin{equation}
+|w_{k,i}^l| < \theta_k^l.
+\end{equation}
+
+In addition, the quantization process reduces numerical precision through three sequential operations that preserve model fidelity through: (1) maintained relative weight relationships via quantization steps, and (2) importance-dependent thresholding that retains critical connections identified by \ac{SHAP} values. Compression ratios adapt dynamically based on layer importance, with more preserved parameters in high-$I_k^l$ layers.
+
+After local compression through quantization and pruning, clients employ lossless encoding (\eg, gzip) for final model serialization before network transmission. The server then executes an aggregation process that accounts for both layer importance and client data distribution.
+
+\subsection{Model Aggregation} 
+
+We further propose a \emph{Context-Aware SHAP Aggregation} mechanism that adapts standard Deep SHAP \cite{bialek2022dataset} to reduce overhead and explicitly incorporate network conditions.
+The central server reconstructs received models and performs layer-specific aggregation using contribution-weighted averaging. For each layer $l$ at communication round $t$, global parameters update based on Eq. \ref{eq:update}.
+In this sense, $\tilde{\mathbf{w}}_k^{l,(t)}$ denotes client $k$'s compressed parameters for layer $l$, and $\gamma_k^l = I_k^l N_k \cdot \widetilde{\tau}_{k,b}$ represents the aggregation weight combining the layer's SHAP-derived importance $I_k^l$, the client's dataset size $N_k$, and the predicted contact time $\widetilde{\tau}_{k,b}$. This triple-weighting scheme prioritizes informative layers, data-rich clients, and stable connections during fusion.
+
+\begin{equation}
+\mathbf{w}^{l,(t+1)} = \frac{\sum_{v \in \mathcal{S}_t} I_v^l N_v \widetilde{\tau}_{v,b} \tilde{\mathbf{w}}_v^{l,(t)}}{\sum_{v \in \mathcal{S}_t} I_v^l N_v \widetilde{\tau}_{v,b}}
+\label{eq:update}
+\end{equation}
+
+Following aggregation, the server broadcasts the updated model $\mathbf{w}^{(t+1)}$ to all participating clients. The distributed parameters undergo decompression and local fine-tuning before initiating the subsequent FL round.
+
+\subsection{Mobility Prediction via Kalman Filter}
+% \sid{TEM QUE EXPLICAR A IMPORTÂNCIA DE SE TER A DIREÇÃO E DE SE FAZER A PREDIÇÃO, POIS ISSO INCLUSIVE MELHORA E MUITO OS RESULTADOS. FAZ UMA INTRODUÇÃO, COLOCA EXEMPLOS E ETC. ESTÁ MUITO DIRETO E SEM LIGAÇÃO}.
+
+Mobility and direction prediction are pivotal in \ac{VFL} to mitigate communication disruptions caused by vehicular movement. For example, a vehicle traveling at high speed toward the edge of a base station’s coverage area may disconnect mid-transmission, while one moving along a predictable route within dense urban infrastructure can maintain stable links. Accurately forecasting these patterns enables the server to select clients with sufficient contact time for complete model exchanges, reducing partial updates and stragglers. The Kalman filter is particularly suited for this task, as it efficiently estimates future positions and velocities despite measurement noise from GPS or onboard sensors. By analyzing a vehicle’s trajectory, \alg{} predicts its dwell time within communication range, dynamically adjusting client selection weights. This ensures that participants likely to remain connected throughout the training round are prioritized, while those with erratic paths or impending handovers are deprioritized. Such context-aware selection is indispensable in \ac{VFL}, where mobility directly impacts both communication reliability and the quality of federated updates.
+
+To handle vehicular mobility, each client $k$ maintains an internal Kalman filter to predict its position and velocity over short time horizons. Define the state vector:
+\[
+\mathbf{x}_k(t) \;=\; 
+\begin{bmatrix}
+p_x \\[0.3em]
+p_y \\[0.3em]
+v_x \\[0.3em]
+v_y
+\end{bmatrix},
+\]
+representing the vehicle’s 2D position $(p_x,p_y)$ and velocity $(v_x,v_y)$. The state evolves according to
+\[
+\mathbf{x}_k(t+1) = \mathbf{F}\,\mathbf{x}_k(t) \;+\; \mathbf{w}_k(t),
+\]
+where $\mathbf{F}$ is the state-transition matrix (assuming constant velocity or a simple motion model), and $\mathbf{w}_k(t)$ is process noise.
+
+At each timestep, the client receives GPS (or other localization) measurements
+\[
+\mathbf{z}_k(t) = \mathbf{H}\,\mathbf{x}_k(t) \;+\; \mathbf{r}_k(t),
+\]
+where $\mathbf{H}$ is the observation matrix and $\mathbf{r}_k(t)$ is measurement noise. The standard Kalman filter recursion yields an \emph{a posteriori} state estimate $\widehat{\mathbf{x}}_k(t)$ and covariance $\mathbf{P}_k(t)$. Using these estimates, client $k$ can predict its future trajectory $\widehat{\mathbf{x}}_k(t+\Delta)$ for a short horizon $\Delta$.
+
+Given a base station $b$ with coverage radius $r_b$, the \emph{predicted contact time} $\tau_{k,b}$ is approximated by the time until the vehicle’s position estimate leaves the coverage region. A simple discrete-time estimate is:
+\[
+\tau_{k,b} \approx 
+\max\!\bigl( 0,\; \tfrac{ \|\mathbf{p}_k(t) - \mathbf{b}\| - r_b }{\|\mathbf{v}_k(t)\|} \bigr),
+\]
+where $\mathbf{p}_k(t)$ and $\mathbf{v}_k(t)$ are the position and velocity extracted from the Kalman filter’s current estimate, and $\mathbf{b}$ denotes the base station’s location. The client then normalizes $\tau_{k,b}$ for reporting:
+\[
+\widetilde{\tau}_{k,b} = \frac{\tau_{k,b}}{\tau_{\max}},
+\]
+where $\tau_{\max}$ is a reference maximum contact time (e.g., the longest feasible dwell time in the simulation).
+
+\subsection{Algorithm Description}
+
+\begin{algorithm}
+\SetAlgoLined
+\DontPrintSemicolon
+\KwIn{Initial global model $\mathbf{w}^{(0)}$, client set $\mathcal{V}$, total rounds $T$, 
+    \hspace{2.2cm}base station set $\mathcal{B}$, pruning base threshold $\theta_{\text{base}}$}
+\KwOut{Optimized global model $\mathbf{w}^{(T)}$}
+\For{$t \leftarrow 1$ \KwTo $T$}{
+    \textbf{Server executes:}\;
+    \textbf{1. Client Selection:}\;
+    \ForEach{client $v \in \mathcal{V}$}{
+        Predict contact time $\tau_{v,b}$ via Kalman filter (Sec. 4.6)\;
+        Compute $\widetilde{\tau}_{v,b} = \frac{\tau_{v,b}}{\tau_{\max}}$\;
+        Compute context factor $\omega_v$ using Eq.~\ref{eq:omega}\;
+        Calculate normalized metrics: $\widetilde{A}_v$, $\widetilde{N}_v$\;
+        Compute selection score $S_v$ using Eq.~\ref{eq:score}\;
+    }
+    Select subset $\mathcal{S}_t \leftarrow \underset{v \in \mathcal{V}}{\text{topK}} \left(S_v\right)$ with $\text{RSSI}_v \geq \text{RSSI}_{\text{min}}$\;
+    
+    \textbf{2. Model Broadcast:}\;
+    Send $\mathbf{w}^{(t)}$ to all selected clients $v \in \mathcal{S}_t$\;
+    
+    \textbf{3. Client Updates (parallel execution):}\;
+    \ForEach{client $v \in \mathcal{S}_t$}{
+        Local training: $\mathbf{w}_v^{(t)} \leftarrow \text{SGD}(\mathbf{w}^{(t)}, \mathcal{D}_v, E)$\;
+        Compute layer importance $I_v^l$ via SHAP (Eqs. \ref{eq:baseline_shap}-\ref{eq:contextualized_score})\;
+        \ForEach{layer $l \in \mathcal{L}$}{
+            Calculate pruning threshold $\theta_v^l$ using Eq.~\ref{eq:threshold}\;
+            Prune weights: $\tilde{\mathbf{w}}_v^l \leftarrow \text{Prune}(\mathbf{w}_v^l, \theta_v^l)$\;
+        }
+        Quantize $\tilde{\mathbf{w}}_v$ and compress\;
+        Send $(\tilde{\mathbf{w}}_v, I_v^l, N_v)$ to server\;
+    }
+    
+    \textbf{4. Importance-Weighted Aggregation:}\;
+    \ForEach{layer $l \in \mathcal{L}$}{
+        $\mathbf{w}^{l,(t+1)} \leftarrow \frac{\sum_{v \in \mathcal{S}_t} I_v^l N_v \tilde{\mathbf{w}}_v^l}{\sum_{v \in \mathcal{S}_t} I_v^l N_v}$ \tcp*{Eq.~\ref{eq:update}}
+    }
+    Update global model $\mathbf{w}^{(t+1)} \leftarrow \{\mathbf{w}^{l,(t+1)}\}_{l=1}^L$\;
+}
+\caption{FLIPS Algorithm with Mobility Prediction}\label{alg:flips}
+\end{algorithm}
+
+The FLIPS algorithm operates in rounds (line 3) to optimize a global model $\mathbf{w}^{(T)}$. In each round $t$, the server performs four key phases:
+(lines 5--12): For each client $v \in \mathcal{V}$ (line 6), the server predicts contact time $\tau_{v,b}$ using a Kalman filter (line 7), computes the normalized predicted contact time $\widetilde{\tau}_{v,b}$, and then calculates a context factor $\omega_v$ using Eq.~\ref{eq:omega} which incorporates $\widetilde{\tau}_{v,b}$ (line 8). The server then normalizes other metrics $\widetilde{A}_v$, $\widetilde{N}_v$ (line 9), and calculates a selection score $S_v$ (line 10). The top-$K$ clients with sufficient RSSI are selected into $\mathcal{S}_t$ (line 12).
+(line 14--15): The server sends the current global model $\mathbf{w}^{(t)}$ to all selected clients (line 15).
+(lines 17--27): Each client $v \in \mathcal{S}_t$ (line 18) locally trains $\mathbf{w}_v^{(t)}$ via SGD for $E$ epochs (line 19), computes layer-wise importance scores $I_v^l$ using SHAP (line 20), which now factor in mobility through $\omega_v$, and prunes each layer $l$ using adaptive thresholds $\theta_v^l$ (lines 21--24). The pruned weights $\tilde{\mathbf{w}}_v$ are quantized, compressed (line 25), and transmitted to the server (line 26).
+(lines 29--33): The server aggregates pruned weights layer-wise (line 31), weighted by $I_v^l$ (now mobility-aware via $\widetilde{\tau}_{v,b}$) and data size $N_v$, to update the global model (line 33).
+
+\subsubsection{Complexity Analysis}
+
+Let $V = |\mathcal{V}|$, $K = |\mathcal{S}_t|$, $L = |\mathcal{L}|$, $P$ be the model size, and $E$ local epochs. Client selection costs $O(V(L + \log V))$ per round (Kalman filter, score computation, and top-$K$ selection). Client updates dominate with $O(K(E|\mathcal{D}_v| + L(P/L + \text{SHAP}))$ per client, where SHAP complexity depends on approximation methods. Aggregation requires $O(KLP/L) = O(KP)$. Overall, the algorithm has $O(T(V\log V + K(E|\mathcal{D}_v| + P + L\cdot\text{SHAP})))$ time complexity, dominated by client-side computations and linear in $T$ and $K$.
+
+
+\section{Evaluation}
+\label{sec:experiments}
+
+In this section, we evaluate the performance of the  \alg{} compared with several well-known \ac{FL} algorithms to demonstrate its effectiveness in terms of communication efficiency, model accuracy, and convergence speed.
+The experiments aim to highlight the benefits of selective layer pruning, multifactor client selection, and \ac{SHAP}-based importance weighting.
+
+\subsection{Experimental Setup}
+
+We considered the NS-3.43 network simulator\footnote{ns-3: \url{https://www.nsnam.org/}} integrated with TensorFlow and Keras\footnote{TensorFlow: \url{https://www.tensorflow.org/}} to implement and run the various \ac{FL} algorithms in a \ac{VFL} scenario. The integration allowed us to simulate realistic communication scenarios alongside deep learning processes, where TensorFlow and Keras handled model training and inference. 
+We simulated an \ac{VFL} environment with a set of $K=50$ clients, and clients are heterogeneous in terms of data distribution, computational capabilities, and communication conditions.
+Each vehicle moves following mobility patterns generated by SUMO\footnote{SUMO: \url{https://www.eclipse.org/sumo/}} in a Manhattan grid layout, simulating traffic dynamics and connectivity fluctuations within a structured urban environment.
+The mobility model combined with ns-3’s created a comprehensive scenario to capture the challenges of dynamic connectivity, variable data distributions, and fluctuating network conditions. We repeated each simulation scenario 33 times to ensure statistical significance, and results were averaged, providing robust performance evaluations of the algorithms under study.
+
+The experiments consider the CIFAR-100 dataset, 
+which consists of 100 classes, each containing 600 images, resulting in a more fine-grained classification task.
+This dataset is suitable for evaluating FL algorithms in scenarios requiring higher levels of granularity and complexity in image classification.
+We consider data with non-IID characteristics to introduce data heterogeneity, ensuring a realistic representation of data distribution as commonly expected in many FL applications. We employed the Dirichlet distribution with a concentration parameter of  $\alpha = 0.5$, providing a realistic balance between heterogeneity and uniformity, appropriately reflecting the diversity of data in vehicular environments \cite{li2021model}. Hence, this partitioning approach allowed us to rigorously evaluate the robustness and performance of the proposed \alg{} framework and the baseline methods under challenging conditions of data imbalance and non-\ac{IID} distributions.
+
+The global model used in our experiments is a custom 5-layer \ac{CNN}, which is defined as follows. The input layer accepts images of size 32×32×3. The first convolutional layer employs 32 filters of size 3×3 with stride 1, followed by a rectified linear unit (ReLU) activation and a 2×2 max pooling operation. The second convolutional layer consists of 64 filters of size 3×3, again followed by ReLU activation and a 2×2 max pooling layer. The third convolutional layer utilizes 128 filters of size 3×3, with subsequent ReLU activation and a 2×2 max pooling layer. The output from the convolutional layers is flattened and passed to a fully connected layer comprising 256 neurons with ReLU activation. The final layer is a softmax layer whose number of neurons corresponds to the number of classes in the dataset.
+
+We compared the performance of two variants of the \alg{} algorithm: one with the usage of mobility prediction as a factor for client selection (denoted as FLIPS w/ MP) and one which uses RSSI rather than mobility prediction (denoted as FLIPS w/o MP).
+The \alg{} algorithm is compared against 5 \ac{FL} frameworks, namely, \ac{FedAvg}, \ac{FedProx}, \ac{FedLAMA}, centralized learning, and local learning.
+Specifically, centralized learning involves aggregating all data from distributed clients at the central server, where it assumes unrestricted data sharing and centralized computational resources.
+Local learning refers to the scenario where each client trains its model independently using only its local data, \ie, without any communication or parameter sharing with other clients or a central server.
+\ac{FedAvg} is a baseline \ac{FL} algorithm that combines local model updates with periodic averaging \cite{mcmahan2017communication}.
+\ac{FedProx} extends \ac{FedAvg} by introducing a proximal term to the local objective functions, which  penalize deviations from the global model during local updates. This effectively addresses issues arising from varying data distributions and computational capabilities among clients \cite{li2018federated}.
+\ac{FedLAMA} adjusts the aggregation intervals of model layers in a layer-wise manner, where it determines optimal synchronization frequencies for each layer, allowing for reduced communication without significantly impacting model accuracy.
+Finally, \alg{} relies on instantaneous network conditions and client resource availability for selection, as introduced in Section 4. 
+
+\subsection{Results}
+
+\begin{comment}
+    
+
+In the convergence plot for EMNIST (Figure~\ref{fig:emnist_conv}), \textit{Centralized Learning} achieves the highest accuracy at around 97\%. 
+Since all training data is pooled into a single location in the centralized approach, the model can optimize its parameters more effectively without being constrained by communication delays or data heterogeneity. 
+This favorable environment accelerates convergence and maximizes accuracy because the model has unrestricted access to the entire dataset. 
+By contrast, federated approaches must reconcile updates from multiple clients under bandwidth and synchronization constraints, which typically delays convergence and can lead to slightly lower final performance. 
+Nevertheless, the gap between centralized and federated methods narrows over additional communication rounds as more global knowledge is incorporated into the model.
+
+\begin{figure}[!htb]
+    \centering
+    \includegraphics[width=\linewidth]{figures/Convergence_EMNIST.pdf}
+    \caption{Convergence for the EMNIST Dataset.}
+    \label{fig:emnist_conv}
+\end{figure}
+
+Figure~\ref{fig:cifar10_conv} illustrates a similar pattern for the CIFAR-10 dataset, where \textit{Centralized Learning} again obtains the top accuracy (approximately 80\%). 
+Compared to EMNIST, the CIFAR-10 task is more visually complex and places higher demands on the model’s feature extraction capabilities. 
+Although the centralized approach benefits from immediate access to all 10 classes, federated methods also demonstrate solid convergence trends with incremental performance gains over multiple rounds. 
+Key factors such as the non-\ac{IID} distribution of images, varying client resources, and communication overhead mildly hamper the speed of convergence in federated methods but do not prevent them from approaching relatively high accuracy once enough global updates are processed.
+
+\begin{figure}[!htb]
+    \centering
+    \includegraphics[width=\linewidth]{figures/Convergence_CIFAR10.pdf}
+    \caption{Convergence for the CIFAR-10 Dataset.}
+    \label{fig:cifar10_conv}
+\end{figure}
+
+\end{comment}
+
+Figure \ref{fig:cifar100_conv} shows the evolution of the prediction accuracy on the test dataset for all evaluated frameworks. It is important to mention that CIFAR-100 has 100 distinct classes and more intricate class distinctions, naturally posing greater challenges for both centralized and \ac{FL} frameworks. 
+We can note from the results, that the \alg{} variant with the usage of mobility prediction converges faster and to a higher accuracy than the variant without mobility prediction.
+This highlights the fact that VFL solutions, must take into account parameters such as contact time, speed and direction of the vehicle.
+By analyzing the results, we conclude that centralized learning achieves the highest accuracy at around 92\%, since all training data is uploaded into a single location, \ie, the central server. In this sense, the model can optimize its parameters more effectively without being constrained by communication delays or data heterogeneity, accelerating the convergence at the cost of access to the entire dataset. 
+On the other hand, \ac{FL} frameworks transmit updates from multiple clients under bandwidth and synchronization constraints of \ac{VFL} environment, which typically delays convergence and can lead to slightly lower final accuracy. 
+Nevertheless, the gap between centralized and \ac{FL} frameworks narrows over additional communication rounds, since \ac{FL} typically requires more communication rounds to handle the deeper label hierarchy and increased data heterogeneity.
+The slight performance gap in comparison to the centralized method arises due to partitioned data, non-uniform class distributions among clients, and possible communication bottlenecks during model synchronization. 
+
+\begin{figure}[!htb]
+    \centering
+    \includegraphics[width=\linewidth]{results/Algorithm_Convergence.pdf}
+    \caption{Accuracy over epochs for the tested frameworks}
+    \label{fig:cifar100_conv}
+\end{figure}
+
+Figure \ref{fig:accuracy_comp} depicts the final accuracy for the analyzed frameworks.
+The results indicate that the FLIPS framework achieves performance levels close to those of centralized learning, \ie, \alg{} w/ MP achieves an accuracy of 91\% while centralized learning provides an accuracy of 75\%, and \alg{} w/o MP archives an accuracy of 89\%. 
+However, centralized learning leads to high latency and communication costs for transferring the user data, and also poses privacy concerns as sensitive data could be intercepted.
+On the other hand, \alg{} consistently demonstrates higher accuracy than the analyzed \ac{FL} frameworks, where \alg{} provides an accuracy of 1\% lower than Centralized Learning but higher by 4\%, 6\%, 9\%, and  14\% compared  to \ac{FedLAMA}, \ac{FedProx}, \ac{FedAvg}, and Local Learning, respectively.
+The differing behaviors of \ac{FedAvg}, \ac{FedProx}, \ac{FedLAMA}, and \alg{} can be traced back to each algorithm’s specific design for handling communication efficiency, heterogeneity, and reliability in \ac{VFL} environment. In particular, \alg{} stands out due to consistently high throughput, stable convergence, and strong overall accuracy.
+
+\begin{figure}[!htb]
+    \centering
+    \includegraphics[width=0.48\textwidth]{results/Algorithm_Accuracies.pdf}
+    \caption{Final Accuracy for the tested frameworks}
+    \label{fig:accuracy_comp}
+\end{figure}
+
+    
+
+\begin{comment}
+\begin{figure}[!htb]
+    \centering
+    \includegraphics[width=0.4\textwidth]{figures/FLIPS.pdf}
+    \caption{Network Throughput for the \ac{FLIPS} Algorithm.}
+    \label{fig:flips_thr}
+\end{figure}
+\begin{figure}[!htb]
+    \centering
+    \includegraphics[width=0.4\textwidth]{figures/FEDAVG.pdf}
+    \caption{Network Throughput for the \ac{FedAvg} Algorithm.}
+    \label{fig:fedavg_thr}
+\end{figure}
+\begin{figure}[!htb]
+    \centering
+    \includegraphics[width=0.4\textwidth]{figures/FEDPROX.pdf}
+    \caption{Network Throughput for the \ac{FedProx} Algorithm.}
+    \label{fig:fedprox_thr}
+\end{figure}
+\begin{figure}[!htb]
+    \centering
+    \includegraphics[width=0.4\textwidth]{figures/FEDLAMA.pdf}
+    \caption{Network Throughput for the \ac{FedLAMA} Algorithm.}
+    \label{fig:fedlama_thr}
+\end{figure}
+\end{comment}
+
+\begin{figure*}
+    \centering
+        \begin{subfigure}[b]{0.3\textwidth}
+        \includegraphics[width=\textwidth]{results/FLIPS_MP.pdf}
+        \caption{\alg{} with Mobility Prediction}
+        \label{fig:flips_mp_thr}
+    \end{subfigure}\hfill
+    \begin{subfigure}[b]{0.3\textwidth}
+        \includegraphics[width=\textwidth]{results/FLIPS_.pdf}
+        \caption{\alg{} without Mobility Prediction}
+        \label{fig:flips_thr}
+    \end{subfigure}\hfill
+    \begin{subfigure}[b]{0.3\textwidth}
+        \includegraphics[width=\textwidth]{results/FEDAVG_.pdf}
+        \caption{\ac{FedAvg}}
+        \label{fig:fedavg_thr}
+    \end{subfigure} \\ \ \\ 
+    \begin{subfigure}[b]{0.3\textwidth}
+        \includegraphics[width=\textwidth]{results/FEDPROX_.pdf}
+        \caption{\ac{FedProx}}
+        \label{fig:fedprox_thr}
+    \end{subfigure} \ \ \
+    \begin{subfigure}[b]{0.3\textwidth}
+        \includegraphics[width=\textwidth]{results/FEDLAMA_.pdf}
+        \caption{\ac{FedLAMA}}
+        \label{fig:fedlama_thr}
+    \end{subfigure}
+    \caption{Network throughput for the tested \ac{FL} frameworks}
+    \label{fig:throughput}
+\end{figure*}
+
+Figure \ref{fig:throughput} shows the network throughput over time for the tested \ac{FL} frameworks for a randomly selected client, in order to illustrate the network behavior of the algorithms.
+Overall, across all simulations,
+\ac{FedAvg} consumes an average network throughput of 59.96 Mbps, offering moderate throughput compared to the tested \ac{FL} frameworks. However, \ac{FedAvg} does not incorporate explicit mechanisms for handling non-IID data and varying client conditions, often resulting in less effective communication usage. 
+\ac{FedProx} introduces a proximal term to mitigate heterogeneity, stabilizing local training but only modestly 
+enhancing throughput. 
+\ac{FedLAMA} focuses on layer-wise aggregation to decrease communication costs, boosting peak throughput, yet suffers from variability in dynamic vehicular environments.
+Finally, there is a higher bandwidth consumption in the beginning of a round for \alg{}, both with, and without, mobility prediction, which decreases over time.
+Note that the overall bandwidth usage of \alg{} with mobility prediction is the lowest across all algorithms. This is due to the fact that clients with better links over time are chosen due to their mobility pattern, decreasing the amount of packet retransmissions for sending models.
+\alg{} also minimizes the presence of stragglers, as well as performing a higher degree of pruning in the models.
+Hence, clients are able to quickly send their trained models to the server, 
+decreasing the bandwidth usage afterward.
+%\sid{[Lucas:] The following text is the updated paragrath on the network resources, it was just changed to better fit the newest results. Pls let me know if I should change it.}
+\alg{} w/ MP achieves the lowest average throughput value, of 29.03\%, 62.7\%, 63.3\%, and 18.5\% when compared to FLIPS w/o MP, FedAvg, FedProx, and FedLAMA, respesctively.
+This is because \alg{} integrates selective layer pruning, SHAP-based importance weighting, and multifactor client selection to address bandwidth constraints, data imbalance, and unreliable connectivity simultaneously.
+Focusing on critical weights and prioritizing clients with consistent communication resources helps \alg{} achieve robust throughput and faster model convergence. The use of SHAP ensures that the most valuable updates are preserved during model aggregation, thereby balancing reduced communication with high accuracy.
+
+\begin{comment}
+
+\begin{figure}[!htb]
+    \centering
+    \includegraphics[width=0.4\textwidth]{Average_Network_Throughput_Bar_Plot.pdf}
+    \caption{Average Network Throughput for the tested \ac{FL} frameworks}
+    \label{fig:avg_thr}
+\end{figure}
+
+\begin{figure}[!htb]
+    \centering
+    \includegraphics[width=0.4\textwidth]{figures/Impact_of_Non_IID_Data_CIFAR100.pdf}
+    \caption{Impact of different $\alpha$ values of the Dirichlet distribution on Model Accuracy.}
+    \label{fig:noniid}
+\end{figure}
+
+Figure~\ref{fig:noniid} demonstrates the influence of non-\ac{IID} data distributions, controlled by the Dirichlet parameter $\alpha$, on various algorithms (\ac{FLIPS}, \ac{FedLAMA}, \ac{FedProx}, and \ac{FedAvg}) over CIFAR-100. Smaller $\alpha$ values introduce higher heterogeneity, making collaborative learning more challenging.
+Although Centralized Learning consistently achieves the highest accuracy due to full dataset availability, \ac{FLIPS} retains a strong accuracy margin across all $\alpha$ levels. This highlights how selective model pruning, SHAP-based weighting, and client selection balance the effects of non-IID data, ensuring key layers are preserved during compression and that critical client updates shape the global model. In contrast, \ac{FedAvg} experiences a more pronounced drop, lacking a dedicated mechanism to address skewed data distributions. \ac{FedProx} and \ac{FedLAMA} fall between these extremes, underscoring the importance of techniques that explicitly account for layer importance and communication constraints in vehicular networks.
+
+\end{comment}
+
+Figure \ref{fig:failure} shows the results for three distinct dropout patterns during model transmission, demonstrating that incorporating signal strength estimation leads to a more resilient client selection process compared to the reactive approaches used in FedProx and FedLAMA.  The baseline algorithms exhibit significantly higher failure rates, with FedAvg (18.15) being 6.19$\times$ more failure-prone than FLIPS.
+We can analyze the timeout occurrences due to poor network connectivity in Figure \ref{fig:timeouts_connectivity}, where FLIPS w/ MP minimizes connectivity-related disruptions by outperforming FedAvg, FedProx, and FEDLAMA by 87.16\%, 80.71\%, and 79.18\%, respectively.
+
+\begin{figure*}
+    \centering
+    \begin{subfigure}[b]{0.32\linewidth}
+        \includegraphics[width=\textwidth]{results/Dropouts_poor_connectivity_with_DrivePFL.pdf}
+        \caption{Poor network connectivity}
+        \label{fig:timeouts_connectivity}
+    \end{subfigure}
+    \begin{subfigure}[b]{0.32\linewidth}
+        \includegraphics[width=\textwidth]{results/Dropouts_high_mobility_with_DrivePFL.pdf}
+        \caption{Frequent handovers}
+        \label{fig:timeouts_mobility}
+    \end{subfigure}
+    \begin{subfigure}[b]{0.32\linewidth}
+        \includegraphics[width=\textwidth]{results/Dropouts_send_failures_with_DrivePFL.pdf}
+        \caption{Base station congestion}
+        \label{fig:timeouts_overload}
+    \end{subfigure}
+    \caption{Timeout occurrences for three distinct dropout patterns during model transmission for all tested \ac{FL}frameworks}
+    \label{fig:failure}
+\end{figure*}
+
+\begin{figure*}
+    \centering
+    \begin{subfigure}[b]{0.32\textwidth}
+        \includegraphics[width=\textwidth]{results/Network_Performance_10_Traffic.pdf}
+        \caption{10\% of Background Traffic}
+        \label{fig:background10}
+    \end{subfigure}
+    \begin{subfigure}[b]{0.32\textwidth}
+        \includegraphics[width=\textwidth]{results/Network_Performance_50_Traffic.pdf}
+        \caption{50\% of Background Traffic}
+        \label{fig:background50}
+    \end{subfigure}
+    \begin{subfigure}[b]{0.32\textwidth}
+        \includegraphics[width=\textwidth]{results/Network_Performance_100_Traffic.pdf}
+        \caption{100\% of Background Traffic}
+        \label{fig:background100}
+    \end{subfigure}
+    \caption{Model transmission times across traffic conditions (10\%, 50\%, 100\% network load)  for all tested \ac{FL} frameworks}
+    \label{fig:network_perf}
+\end{figure*}
+
+Figure~\ref{fig:timeouts_mobility} demonstrates \alg{} w/ MP effectiveness against mobility-induced failures, validating its ability to anticipate handover events through velocity vector analysis. Specifically, \alg{} w/ MP reduces mobility-induced failures by 85.09\% compared to FedAvg, demonstrating superior adaptability to vehicular movement.
+Figure~\ref{fig:timeouts_overload} examines congestion-related failures using an overload factor $\rho_b = N_{\text{active}}^{(b)}/C_{\text{max}}^{(b)}$, where $N_{\text{active}}$ is active connections and $C_{\text{max}}$ is base station capacity. For instance, FLIPS mitigates overload-related failures by 84.68\% compared to FedAvg, emphasizing its efficiency in bandwidth-constrained environments.
+By analyzing the results, we conclude that FedAvg confirms that conventional FL methods require fundamental redesign for \ac{FL} environments. On the other hand, FLIPS achieves better performance through three synergistic mechanisms: 1) client selection avoiding unstable nodes, 2) adaptive compression based on predicted channel capacity, and 3) dynamic parameter pruning during network congestion ($\rho_b > 0.8$).
+
+
+Figure~\ref{fig:network_perf} compares model transmission times under varying network traffic loads (10\%, 50\%, and 100\%), showing both the first and last client completion times. 
+The results reveal that \alg{} w/ MP demonstrated significantly faster model transmission than baseline algorithms across all traffic conditions, \ie, the server must not wait for slow learners (a.k.a., stragglers) in each communication round, since straggler clients delay the overall FL execution.
+At 10\% traffic, \alg{} w/ MP achieved first-client completion in $11.13 \pm 0.41$s, 5.9$\times$ faster than FedAvg ($66.07 \pm 10.17$s), while the last-client completion time for \alg{} w/ MP ($22.34 \pm 0.79$s) was 4.1$\times$ faster than FedAvg ($91.57 \pm 11.31$s). This gap widened under heavier loads: at 100\% traffic, \alg{} w/ MP maintained first-client completion in $19.31 \pm 0.60$s, compared to $114.75 \pm 7.01$s for FedAvg---a 5.9$\times$ improvement. Notably, FedAvg and FedLAMA consistently reached the 120s simulation timeout limit for last-client completion at full network load, indicating frequent failure to synchronize all clients under congestion. FLIPS achieves substantially faster transmission times at all load levels, with FedAvg and FedLAMA reaching simulation timeouts (120s) for last-client completion at 100\% load.
+
+ 
+
+
+
+\section{Conclusions}
+\label{sec:conclusion}
+
+This article presents \alg{}, a VFL framework that integrates adaptive model compression, intelligent client selection, and explainability-driven aggregation to enhance efficiency and robustness in vehicular federated learning environments. By leveraging SHAP-based importance evaluation, selective layer pruning, and a client selection mechanism, \alg{} significantly reduces communication overhead in mobile and dynamic scenarios while maintaining critical model accuracy. Simulation results show that FLIPS not only achieves accuracy levels comparable to centralized learning but also surpasses baseline methods such as FedAvg, FedProx, and FedLAMA in terms of convergence speed and communication efficiency. These findings highlight FLIPS' robustness in handling heterogeneous data distributions, dynamic network conditions, and bandwidth constraints inherent to vehicular networks
+
+The success of FLIPS lies in its holistic approach, where it judiciously prunes model layers based on their importance, selects clients using multiple relevant criteria, and aggregates updates in an importance-weighted manner. This integrated strategy ensures that the most impactful model updates are prioritized, leading to faster convergence and reduced model transmission sizes. The empirical findings validate the framework’s potential for real-world applications in intelligent transportation systems, offering a scalable and privacy-preserving solution for \ac{VFL} environments.
+
+\bibliographystyle{ieeetr}
+
+\bibliography{bib.bib} 
+
+\end{document}

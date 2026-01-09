@@ -1,0 +1,7 @@
+tensorflow>=2.13.0
+numpy>=1.24.0
+shap>=0.42.0
+filterpy>=1.4.5
+matplotlib>=3.7.0
+pyyaml>=6.0
+tqdm>=4.66.0

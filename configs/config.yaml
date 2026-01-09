@@ -1,0 +1,48 @@
+# FLIPS Configuration
+
+# Federated Learning
+num_clients: 50
+clients_per_round: 10
+num_rounds: 100
+local_epochs: 5
+batch_size: 32
+learning_rate: 0.01
+
+# Data
+dataset: cifar100
+alpha_dirichlet: 0.5
+
+# SHAP
+shap_samples: 100  # Number of samples for SHAP computation (Eq 241)
+shap_recompute_interval: 5  # Recompute SHAP every N rounds
+use_gradient_shap: true  # Use gradient-based SHAP approximation (faster than full DeepSHAP)
+
+# Pruning
+theta_base: 0.01
+alpha_contact: 0.5
+
+# Client selection betas
+beta1_accuracy: 0.2
+beta2_datasize: 0.25
+beta3_time: 0.15
+beta4_density: 0.15
+beta5_contact: 0.25
+
+# Network
+rssi_min: -80  # dBm
+tx_power: 30  # dBm
+coverage_radius: 500  # meters
+max_bandwidth: 100  # Mbps (mmWave)
+
+# Mobility
+manhattan_grid_size: 1000  # meters
+vehicle_speed_mean: 15  # m/s (~54 km/h)
+vehicle_speed_std: 5
+dt: 1.0  # time step for mobility updates (seconds)
+
+# Kalman Filter
+process_noise: 0.1
+measurement_noise: 1.0
+
+# Random seed
+random_seed: 42

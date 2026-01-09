@@ -1,0 +1,92 @@
+{
+    "flips": [
+        {
+            "round": 0,
+            "test_accuracy": 0.02290000021457672,
+            "test_loss": 4.912322044372559,
+            "num_selected_clients": 2,
+            "avg_compression_bytes": 1042586.5,
+            "avg_local_accuracy": 0.09630170464515686
+        },
+        {
+            "round": 1,
+            "test_accuracy": 0.08410000056028366,
+            "test_loss": 4.674937725067139,
+            "num_selected_clients": 2,
+            "avg_compression_bytes": 1003605.5,
+            "avg_local_accuracy": 0.1955345869064331
+        }
+    ],
+    "fedavg": [
+        {
+            "round": 0,
+            "test_accuracy": 0.03920000046491623,
+            "test_loss": 4.654272556304932,
+            "num_selected_clients": 2,
+            "avg_compression_bytes": 2573968.0,
+            "avg_local_accuracy": 0.11908314377069473
+        },
+        {
+            "round": 1,
+            "test_accuracy": 0.08550000190734863,
+            "test_loss": 4.370983600616455,
+            "num_selected_clients": 2,
+            "avg_compression_bytes": 2573968.0,
+            "avg_local_accuracy": 0.1974908784031868
+        }
+    ],
+    "fedbuff": [
+        {
+            "round": 0,
+            "test_accuracy": 0.03449999913573265,
+            "test_loss": 4.585169315338135,
+            "num_selected_clients": 2,
+            "avg_compression_bytes": 1046249.5,
+            "avg_local_accuracy": 0.1094626933336258
+        },
+        {
+            "round": 1,
+            "test_accuracy": 0.08049999922513962,
+            "test_loss": 4.512033462524414,
+            "num_selected_clients": 2,
+            "avg_compression_bytes": 1031763.5,
+            "avg_local_accuracy": 0.1706875003874302
+        }
+    ],
+    "fedprox": [
+        {
+            "round": 0,
+            "test_accuracy": 0.039900001138448715,
+            "test_loss": 4.55105447769165,
+            "num_selected_clients": 2,
+            "avg_compression_bytes": 2573968.0,
+            "avg_local_accuracy": 0.10520327463746071
+        },
+        {
+            "round": 1,
+            "test_accuracy": 0.07460000365972519,
+            "test_loss": 4.338561534881592,
+            "num_selected_clients": 2,
+            "avg_compression_bytes": 2573968.0,
+            "avg_local_accuracy": 0.16073130816221237
+        }
+    ],
+    "fedlama": [
+        {
+            "round": 0,
+            "test_accuracy": 0.037300001829862595,
+            "test_loss": 4.625886917114258,
+            "num_selected_clients": 2,
+            "avg_compression_bytes": 2573968.0,
+            "avg_local_accuracy": 0.1421353667974472
+        },
+        {
+            "round": 1,
+            "test_accuracy": 0.037300001829862595,
+            "test_loss": 4.625886917114258,
+            "num_selected_clients": 2,
+            "avg_compression_bytes": 0.0,
+            "avg_local_accuracy": 0.19589035958051682
+        }
+    ]
+}

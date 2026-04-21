@@ -60,21 +60,15 @@ class FedLamaAggregator(BaseAggregator):
         received_weights = first_client['weights']
         
         active_indices = [i for i, w in enumerate(received_weights) if w is not None]
-
-        #active indices for deltacoding
-        active_delta_indices = [i for i, w in enumerate(first_client['delta_weights']) if w is not None]
         
         # Standard FedAvg on ACTIVE weights
         new_global_weights = list(server.global_weights) # Copy
-
-        new_delta_weights = list(server.global_weights)
         
         
         total_samples = sum(u['num_samples'] for u in client_updates.values())
         
         for idx in active_indices:
             weighted_sum = np.zeros_like(new_global_weights[idx])
-            delta_sum = np.zeros_like(new_delta_weights[idx])
             
             # Discrepancy calculation: Variance of updates?
             # Or L2 distance from global?
@@ -85,7 +79,6 @@ class FedLamaAggregator(BaseAggregator):
             # If updates are similar (low variance), aggregate LESS OFTEN.
             
             updates_stack = []
-            delta_stack = []
             
             for client_id, update in client_updates.items():
                 w_client = update['weights'][idx]
@@ -93,22 +86,9 @@ class FedLamaAggregator(BaseAggregator):
                 
                 weighted_sum += w_client * n_client
                 updates_stack.append(w_client)
-
+                
             # Update global
             new_global_weights[idx] = weighted_sum / total_samples
-
-            #for deltacoding
-            for client_id, update in client_updates.items():
-                w_client = update['delta_weights'][idx]
-                n_client = update['num_samples']
-                
-                delta_sum += w_client * n_client
-                delta_stack.append(w_client)
-
-            # Update global delta weights
-            new_delta_weights[idx] = delta_sum / total_samples  
-
-            # The delta coding part won't change discrepancy based update  
             
             # Adopt Discrepancy-based Interval Update
             # Metric: Normalized Variance of client updates for this layer
@@ -144,7 +124,7 @@ class FedLamaAggregator(BaseAggregator):
         # We will assume get_active_indices was called just before.
         # But safer: Modify BaseAggregator.aggregate signature or Server passes round.
         
-        return new_global_weights, new_delta_weights
+        return new_global_weights
 
     def update_intervals(self, active_indices, round_num):
          for idx in active_indices:

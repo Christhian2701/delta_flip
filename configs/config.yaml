@@ -1,9 +1,9 @@
 # FLIPS Configuration
 
 # Federated Learning
-num_clients: 50
-clients_per_round: 10
-num_rounds: 100
+num_clients: 50 #100
+clients_per_round: 20 #10
+num_rounds: 20 #100
 local_epochs: 5
 batch_size: 32
 learning_rate: 0.01

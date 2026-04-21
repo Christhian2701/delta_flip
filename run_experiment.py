@@ -108,6 +108,7 @@ def main(args):
     # Define algorithms to run
     # Comparison: FLIPS vs FedAvg vs FedBuff vs FedProx vs FedLama
     algorithms = ['flips', 'fedavg', 'fedbuff', 'fedprox', 'fedlama']
+    #algorithms = ['fedbuff']
     
     for algo in algorithms:
         print(f"\n" + "#" * 60)
@@ -145,10 +146,10 @@ def main(args):
     print(f"{'='*60}")
     
     # Save results
-    results_dir = Path("results")
+    results_dir = Path("new_results")
     results_dir.mkdir(exist_ok=True)
     
-    out_file = results_dir / "metrics.json"
+    out_file = results_dir / "metrics_with_delta.json"
     
     # Convert numpy types to native python for JSON serialization
     def convert_numpy(obj):

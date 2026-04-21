@@ -8,6 +8,10 @@ from aggregators.fedbuff import FedBuffAggregator
 from aggregators.flips_aggregator import FLIPSAggregator
 from aggregators.fedprox import FedProxAggregator
 from aggregators.fedlama import FedLamaAggregator
+from aggregators.delta_decompress import delta_decompress
+
+from tensorflow import keras
+
 
 class FLIPSServer:
     """
@@ -30,10 +34,12 @@ class FLIPSServer:
         self.config = config
         self.num_rounds = config['num_rounds']
         self.clients_per_round = config['clients_per_round']
+        self.delta_model = keras.models.clone_model(model)  
 
         # Metrics tracking
         self.round_metrics = []
         self.global_weights = model.get_weights()
+        self.delta_weights = model.get_weights()
         
         # Initialize Aggregator Strategy
         self.aggregator = self._get_aggregator()
@@ -94,7 +100,7 @@ class FLIPSServer:
             # In Phase 3 this comes from vehicle mobility and is set before calling run_round
             contact_time = getattr(client, 'contact_time', 1.0)
             
-            local_weights, num_samples, importance, size = client.train_local(
+            local_weights, num_samples, importance, size, deltas_dictionary = client.train_local(
                 self.global_weights, 
                 active_indices=active_indices
             )
@@ -109,12 +115,39 @@ class FLIPSServer:
                 'weights': local_weights,
                 'num_samples': num_samples,
                 'importance': importance,
-                'contact_time': contact_time
+                'contact_time': contact_time,
+                'deltas_dictionary': deltas_dictionary
             }
             total_compressed_size += size
 
         # 3. Aggregate using Strategy Pattern
-        self.global_weights = self.aggregator.aggregate(self, client_updates, round_num=round_num)
+        '''self.global_weights, self.delta_weights = self.aggregator.aggregate(self, client_updates, round_num=round_num)'''
+
+        # 2.5 rebuilding client updates from deltas_dictionary
+        # idea is to simplify code and be able to handle standard and delta
+        # pipelines the same way in tha aggregators
+
+        for id in client_updates:
+            if client_updates[id]['deltas_dictionary'] is not None:
+                try:
+                    client_updates[id]['delta_weights'] = delta_decompress(client_updates[id]['deltas_dictionary'], self.global_weights)                   
+                except Exception as e:
+                    print(f"Error decompressing deltas for client {id}: {e}")
+                else:
+                    client_updates[id]['deltas_dictionary'] = None
+                    #print(f"Client {id} deltas properly handled")
+
+
+        result = self.aggregator.aggregate(self, client_updates, round_num=round_num)
+
+        if isinstance(result, tuple):
+            self.global_weights, self.delta_weights = result
+            self.delta_model.set_weights(self.delta_weights)
+            print("DELTAS INDENTIFIED")
+        else:
+            #no deltas yet
+            self.global_weights = result
+            self.delta_model.set_weights(self.global_weights)
         
         # FedLama: Update intervals
         if isinstance(self.aggregator, FedLamaAggregator) and active_indices:
@@ -122,12 +155,20 @@ class FLIPSServer:
 
         # Update global model
         self.global_model.set_weights(self.global_weights)
+        #self.delta_model.set_weights(self.delta_weights)
 
         # Evaluate
         X_test, y_test = test_data
         test_loss, test_accuracy = self.global_model.evaluate(
             X_test, y_test, verbose=0
         )
+        # Evaluate delta
+        delta_loss, delta_accuracy = self.delta_model.evaluate(
+            X_test, y_test, verbose=0
+        )
+        
+
+
 
         # Collect metrics
         metrics = {
@@ -137,6 +178,8 @@ class FLIPSServer:
             'num_selected_clients': len(selected_clients),
             'avg_compression_bytes': total_compressed_size / len(selected_clients),
             'avg_local_accuracy': float(np.mean([c.local_accuracy for c in selected_clients])),
+            'delta_accuracy': float(delta_accuracy),
+            'delta_loss': float(delta_loss)
         }
 
         self.round_metrics.append(metrics)

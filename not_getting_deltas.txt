@@ -1,0 +1,84 @@
+project set to run 3 rounds of 13 clients with fedavg only, later in this file there is the terminal output of that, the "RETURN ON Standard FedAvg" print is on line 186 of client.py, the return on line 187 is what is happening, but I expected the one on line 216, please analyse and help me understand what is going wrong
+
+RUNNING ALGORITHM: FEDAVG
+############################################################
+Building fresh model for fedavg...
+/home/christhian/2026_articles/flips_new/flips/lib/python3.12/site-packages/keras/src/layers/convolutional/base_conv.py:113: UserWarning: Do not pass an `input_shape`/`input_dim` argument to a layer. When using Sequential models, prefer using an `Input(shape)` object as the first layer in the model instead.
+  super().__init__(activity_regularizer=activity_regularizer, **kwargs)
+E0000 00:00:1776427497.315922   30294 cuda_platform.cc:52] failed call to cuInit: INTERNAL: CUDA error: Failed call to cuInit: UNKNOWN ERROR (303)
+Initialized 13 clients.
+
+Starting Federated Learning (FLIPS Phase 3)
+Num clients: 13
+Clients per round: 10
+Num rounds: 3
+------------------------------------------------------------
+RUNNING TRAIN LOCAL FROM CLIENT.PY
+RETURN ON Standard FedAvg
+RUNNING TRAIN LOCAL FROM CLIENT.PY
+RETURN ON Standard FedAvg
+RUNNING TRAIN LOCAL FROM CLIENT.PY
+RETURN ON Standard FedAvg
+RUNNING TRAIN LOCAL FROM CLIENT.PY
+RETURN ON Standard FedAvg
+RUNNING TRAIN LOCAL FROM CLIENT.PY
+RETURN ON Standard FedAvg
+RUNNING TRAIN LOCAL FROM CLIENT.PY
+RETURN ON Standard FedAvg
+RUNNING TRAIN LOCAL FROM CLIENT.PY
+RETURN ON Standard FedAvg
+RUNNING TRAIN LOCAL FROM CLIENT.PY
+RETURN ON Standard FedAvg
+RUNNING TRAIN LOCAL FROM CLIENT.PY
+RETURN ON Standard FedAvg
+RUNNING TRAIN LOCAL FROM CLIENT.PY
+RETURN ON Standard FedAvg
+RUNNING FEDAVG AGGREGATOR
+Round   0 | Acc: 0.0141 | Loss: 4.6069 | Comp: 2573968 B | Clients: 10 | AvgTau: 0.11 | delta_acc: 0.0141
+RUNNING TRAIN LOCAL FROM CLIENT.PY
+RETURN ON Standard FedAvg
+RUNNING TRAIN LOCAL FROM CLIENT.PY
+RETURN ON Standard FedAvg
+RUNNING TRAIN LOCAL FROM CLIENT.PY
+RETURN ON Standard FedAvg
+RUNNING TRAIN LOCAL FROM CLIENT.PY
+RETURN ON Standard FedAvg
+RUNNING TRAIN LOCAL FROM CLIENT.PY
+RETURN ON Standard FedAvg
+RUNNING TRAIN LOCAL FROM CLIENT.PY
+RETURN ON Standard FedAvg
+RUNNING TRAIN LOCAL FROM CLIENT.PY
+RETURN ON Standard FedAvg
+RUNNING TRAIN LOCAL FROM CLIENT.PY
+RETURN ON Standard FedAvg
+RUNNING TRAIN LOCAL FROM CLIENT.PY
+RETURN ON Standard FedAvg
+RUNNING TRAIN LOCAL FROM CLIENT.PY
+RETURN ON Standard FedAvg
+RUNNING FEDAVG AGGREGATOR
+Round   1 | Acc: 0.0380 | Loss: 4.4870 | Comp: 2573968 B | Clients: 10 | AvgTau: 0.14 | delta_acc: 0.0380
+RUNNING TRAIN LOCAL FROM CLIENT.PY
+RETURN ON Standard FedAvg
+RUNNING TRAIN LOCAL FROM CLIENT.PY
+RETURN ON Standard FedAvg
+RUNNING TRAIN LOCAL FROM CLIENT.PY
+RETURN ON Standard FedAvg
+RUNNING TRAIN LOCAL FROM CLIENT.PY
+RETURN ON Standard FedAvg
+RUNNING TRAIN LOCAL FROM CLIENT.PY
+RETURN ON Standard FedAvg
+RUNNING TRAIN LOCAL FROM CLIENT.PY
+RETURN ON Standard FedAvg
+RUNNING TRAIN LOCAL FROM CLIENT.PY
+RETURN ON Standard FedAvg
+RUNNING TRAIN LOCAL FROM CLIENT.PY
+RETURN ON Standard FedAvg
+RUNNING TRAIN LOCAL FROM CLIENT.PY
+RETURN ON Standard FedAvg
+RUNNING TRAIN LOCAL FROM CLIENT.PY
+RETURN ON Standard FedAvg
+RUNNING FEDAVG AGGREGATOR
+Round   2 | Acc: 0.0434 | Loss: 4.2514 | Comp: 2573968 B | Clients: 10 | AvgTau: 0.11 | delta_acc: 0.0434
+------------------------------------------------------------
+Final Test Accuracy: 0.0434
+

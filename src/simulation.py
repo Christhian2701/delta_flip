@@ -91,7 +91,8 @@ def run_federated_learning(clients, server, test_data, config):
                   f"Loss: {metrics['test_loss']:.4f} | "
                   f"Comp: {int(metrics['avg_compression_bytes'])} B | "
                   f"Clients: {len(selected_clients)} | "
-                  f"AvgTau: {avg_contact:.2f}")
+                  f"AvgTau: {avg_contact:.2f} | "
+                  f"delta_acc: {metrics['delta_accuracy']:.4f}")
 
     print("-" * 60)
     print(f"Final Test Accuracy: {server.round_metrics[-1]['test_accuracy']:.4f}")

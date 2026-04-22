@@ -12,6 +12,8 @@ import pickle
 import sys
 import copy
 import math
+import os
+import csv
 
 class FLIPSClient:
     """
@@ -38,6 +40,15 @@ class FLIPSClient:
         self.X_val = data['X_val']
         self.y_val = data['y_val']
         self.num_samples = len(self.y_train)
+
+        #adding round tracking for compression analysis
+        self.round_track = {
+            'max_rounds' : config.get('num_rounds', 10),
+            'algorithm': config.get('algorithm'),
+            'current_round': 0
+        }
+
+        print(f"Client {self.client_id} round {self.round_track['current_round']} of {self.round_track['max_rounds']}, initialized with {self.num_samples} samples.")
 
         # Clone model for this client
         self.old_model = None # para manter modelo antigo e usar em delta coding
@@ -152,7 +163,7 @@ class FLIPSClient:
                 local_weights = [w if i in active_indices else None for i, w in enumerate(local_weights)]
 
             
-            print("RETURN ON FEDPROX IMPLEMENTATION")
+            #print("RETURN ON FEDPROX IMPLEMENTATION")
 
             try:
                 _, deltas_dictionary = self.quantize_and_compress()
@@ -187,7 +198,7 @@ class FLIPSClient:
                 local_weights = [w if i in active_indices else None for i, w in enumerate(local_weights)]
             
             # Return empty importance/metrics for consistent signature            
-            print("RETURN ON Standard FedAvg") 
+            #print("RETURN ON Standard FedAvg") 
 
             try:
                 _, deltas_dictionary = self.quantize_and_compress()
@@ -420,6 +431,8 @@ class FLIPSClient:
     
     # onde melhor colocar o delta coding
     # tem que manter o modelo antigo para manter o delta
+
+    
     
     def quantize_and_compress(self):
         """
@@ -542,18 +555,45 @@ class FLIPSClient:
         else:
             reduction_percent = 0.0
 
+        current_round = self.round_track.get('current_round', 0)
+
+        compression_info ={
+            'algorithm': self.config.get('algorithm', 'Indefinido'),
+            'round': current_round,
+            'client_id': self.client_id,
+            'original_size_bytes': bytes_original,
+            'delta_size_bytes': bytes_delta,
+            'reduction_percent': reduction_percent
+        }
+
+        #originalmente usava só log_message
         log_message = (
             f"Client {self.client_id} | "
+            f"Algorithm: {self.config.get('algorithm')} | "
+            f"Round: {self.config.get('current_round', 0)} | "
             f"Original Size: {bytes_original} bytes | "
             f"Delta RLE Size: {bytes_delta} bytes | "
             f"Reduction: {reduction_percent:.2f}%\n"
         )
+
+        csv_filename = "client_compression_track.csv"
+        file_exists = os.path.isfile(csv_filename)
+
+        with open(csv_filename, mode="a", newline="", encoding="utf-8") as csv_file:
+        
+            fieldnames = compression_info.keys()
+            writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
+            if not file_exists:
+                writer.writeheader()
+            writer.writerow(compression_info)
         
         # Print to console so you can see it running
-        print(log_message.strip())
+        #print(log_message.strip())
 
         # Append to a text file for later analysis
         # Using 'a' mode to append, so it records every client in every round
         with open("compression_comparison_log.txt", "a") as log_file:
             log_file.write(log_message)
+        
+        self.round_track['current_round'] += 1
     

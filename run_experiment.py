@@ -108,7 +108,7 @@ def main(args):
     # Define algorithms to run
     # Comparison: FLIPS vs FedAvg vs FedBuff vs FedProx vs FedLama
     algorithms = ['flips', 'fedavg', 'fedbuff', 'fedprox', 'fedlama']
-    #algorithms = ['fedbuff']
+    #algorithms = ['flips']
     
     for algo in algorithms:
         print(f"\n" + "#" * 60)

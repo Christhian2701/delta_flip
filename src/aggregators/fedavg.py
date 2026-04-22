@@ -10,7 +10,7 @@ from .delta_decompress import decode_rle, dequantize, unflatten, apply_deltas
 class FedAvgAggregator(BaseAggregator):
     def aggregate(self, server, client_updates, round_num=None):
 
-        print("RUNNING FEDAVG AGGREGATOR")
+        #print("RUNNING FEDAVG AGGREGATOR")
 
 
         """
@@ -41,7 +41,7 @@ class FedAvgAggregator(BaseAggregator):
 
             if client_deltas is not None:
 
-                print("Delta Weights WAS FOUND IN CLIENT UPDATE, PROCEEDING TO add")
+                #print("Delta Weights WAS FOUND IN CLIENT UPDATE, PROCEEDING TO add")
                 
                 delta_weights.append((num_samples, client_deltas))
             else:

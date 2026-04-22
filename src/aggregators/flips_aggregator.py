@@ -12,7 +12,7 @@ class FLIPSAggregator(BaseAggregator):
 
     def aggregate(self, server, client_updates, round_num=None):
 
-        print("RUNNING BASE AGGREGATOR")
+        #print("RUNNING BASE AGGREGATOR")
         #print(f'Client updates keys: {list(client_updates.keys())}')
 
         """

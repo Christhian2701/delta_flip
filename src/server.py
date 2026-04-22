@@ -10,6 +10,11 @@ from aggregators.fedprox import FedProxAggregator
 from aggregators.fedlama import FedLamaAggregator
 from aggregators.delta_decompress import delta_decompress
 
+import gzip
+import pickle
+import os
+import csv
+
 from tensorflow import keras
 
 
@@ -123,6 +128,13 @@ class FLIPSServer:
         # 3. Aggregate using Strategy Pattern
         '''self.global_weights, self.delta_weights = self.aggregator.aggregate(self, client_updates, round_num=round_num)'''
 
+        #Setup server side compression comparison, setting up as to avoid changing the 
+        # flow of the code
+
+        self.server_size_comparison(client_updates)
+
+
+
         # 2.5 rebuilding client updates from deltas_dictionary
         # idea is to simplify code and be able to handle standard and delta
         # pipelines the same way in tha aggregators
@@ -143,7 +155,7 @@ class FLIPSServer:
         if isinstance(result, tuple):
             self.global_weights, self.delta_weights = result
             self.delta_model.set_weights(self.delta_weights)
-            print("DELTAS INDENTIFIED")
+            #print("DELTAS INDENTIFIED")
         else:
             #no deltas yet
             self.global_weights = result
@@ -185,3 +197,55 @@ class FLIPSServer:
         self.round_metrics.append(metrics)
 
         return metrics
+    
+    def server_size_comparison(self, client_updates):
+
+        for client_id, update in client_updates.items():
+            # for each client, mirrors the compression comparison done on the client side
+
+            #print(f'Client {client_id} keys: {update.keys()}')
+
+            #standard_serialized = pickle.dumps(update['weights'])
+            standard_serialized =[]
+
+            for peso in update['weights']:
+                if peso is not None:
+                    standard_serialized.append(peso.astype(np.float16))             
+
+            standard_serialized = pickle.dumps(standard_serialized)
+            standard_compressed = gzip.compress(standard_serialized)
+            standard_size_bytes = len(standard_compressed)
+
+            if standard_serialized is None:
+                delta_size_bytes = standard_size_bytes
+                
+            else:
+
+                delta_serialized = pickle.dumps(update['deltas_dictionary'])
+                delta_compressed = gzip.compress(delta_serialized)
+                delta_size_bytes = len(delta_compressed)
+
+            compression_info = {
+                'algorithm': self.config.get('algorithm', 'Indefinido'),
+                'round': self.round_metrics[-1]['round'] if self.round_metrics else 0,
+                'client_id': client_id,
+                'standard_size_bytes': standard_size_bytes,
+                'delta_size_bytes': delta_size_bytes,
+                'reduction_percent': (1 - delta_size_bytes / standard_size_bytes) * 100 if standard_size_bytes > 0 else 0
+            }
+
+            csv_filename = "server_compression_track.csv"
+            file_exists = os.path.isfile(csv_filename)
+
+            with open(csv_filename, mode="a", newline="", encoding="utf-8") as csv_file:
+            
+                fieldnames = compression_info.keys()
+                writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
+                if not file_exists:
+                    writer.writeheader()
+                writer.writerow(compression_info)
+
+
+
+            
+        

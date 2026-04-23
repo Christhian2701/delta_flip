@@ -10,48 +10,46 @@ from tensorflow.keras import layers
 
 def build_cnn(input_shape=(32, 32, 3), num_classes=100):
     """
-    Build 5-layer CNN as specified in FLIPS paper.
-
-    Architecture:
-    - Conv1: 32 filters, 3x3, ReLU, MaxPool 2x2
-    - Conv2: 64 filters, 3x3, ReLU, MaxPool 2x2
-    - Conv3: 128 filters, 3x3, ReLU, MaxPool 2x2
-    - FC: 256 neurons, ReLU
-    - Output: num_classes neurons, Softmax
-
-    Args:
-        input_shape: Input image shape (default: 32x32x3 for CIFAR-100)
-        num_classes: Number of output classes (default: 100 for CIFAR-100)
-
-    Returns:
-        Keras model
+    Robust VGG-style CNN for FLIPS.
+    Uses LayerNormalization to avoid breaking delta coding pipelines 
+    (no non-trainable moving statistics).
     """
     model = keras.Sequential([
-        # Layer 1: Conv32
-        layers.Conv2D(32, (3, 3), activation='relu', padding='same',
-                     input_shape=input_shape, name='conv1'),
+        # Block 1
+        layers.Conv2D(64, (3, 3), padding='same', input_shape=input_shape, name='conv1'),
+        layers.LayerNormalization(axis=-1, name='ln1'),
+        layers.Activation('relu'),
         layers.MaxPooling2D((2, 2), name='pool1'),
+        layers.Dropout(0.2),
 
-        # Layer 2: Conv64
-        layers.Conv2D(64, (3, 3), activation='relu', padding='same', name='conv2'),
+        # Block 2
+        layers.Conv2D(128, (3, 3), padding='same', name='conv2'),
+        layers.LayerNormalization(axis=-1, name='ln2'),
+        layers.Activation('relu'),
         layers.MaxPooling2D((2, 2), name='pool2'),
+        layers.Dropout(0.3),
 
-        # Layer 3: Conv128
-        layers.Conv2D(128, (3, 3), activation='relu', padding='same', name='conv3'),
+        # Block 3
+        layers.Conv2D(256, (3, 3), padding='same', name='conv3'),
+        layers.LayerNormalization(axis=-1, name='ln3'),
+        layers.Activation('relu'),
         layers.MaxPooling2D((2, 2), name='pool3'),
+        layers.Dropout(0.4),
 
-        # Flatten
+        # Flatten & Dense Classifier
         layers.Flatten(name='flatten'),
+        
+        # Increased dense capacity for 100 classes
+        layers.Dense(512, name='fc1'), 
+        layers.LayerNormalization(axis=-1, name='ln4'),
+        layers.Activation('relu'),
+        layers.Dropout(0.5),
 
-        # Layer 4: FC256
-        layers.Dense(256, activation='relu', name='fc'),
-
-        # Layer 5: Output (Softmax)
+        # Output
         layers.Dense(num_classes, activation='softmax', name='output')
-    ], name='FLIPS_CNN')
+    ], name='FLIPS_CNN_LayerNorm')
 
     return model
-
 
 def compile_model(model, learning_rate=0.01):
     """

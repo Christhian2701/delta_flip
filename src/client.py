@@ -1,4 +1,5 @@
 """
+alteração de modelo
 FLIPS Client implementation.
 
 MODIFIDAÇÕES FEITAS AQUI
@@ -52,7 +53,8 @@ class FLIPSClient:
 
         # Clone model for this client
         self.old_model = None # para manter modelo antigo e usar em delta coding
-        self.model = keras.models.clone_model(model)
+        #self.model = keras.models.clone_model(model)
+        self.model = model
         self.model.set_weights(model.get_weights())
         self.model.compile(
             optimizer=keras.optimizers.SGD(learning_rate=config['learning_rate']),
@@ -91,6 +93,49 @@ class FLIPSClient:
         term3 = g3 * self.contact_time
         
         return min(1.0, term1 + term2 + term3)
+    
+    def bn_train_fedprox(self, global_weights):
+        """
+        FedProx Local Training: L(w) + (mu/2) * ||w - w^t||^2
+        """
+        mu = self.config.get('mu', 0.01)
+        optimizer = keras.optimizers.SGD(learning_rate=self.config['learning_rate'])
+        
+        # FIX: Snapshot the global trainable weights directly from the model.
+        # Since self.model.set_weights(global_weights) was called right before this,
+        # self.model.trainable_variables currently holds the exact global trainable weights.
+        # We use tf.identity to create a detached copy of these tensors for the loss calculation.
+        global_trainable_weights = [tf.identity(w) for w in self.model.trainable_variables]
+
+        # Prepare dataset
+        train_dataset = tf.data.Dataset.from_tensor_slices((self.X_train, self.y_train))
+        train_dataset = train_dataset.shuffle(buffer_size=1024).batch(self.batch_size)
+        
+        loss_fn = keras.losses.SparseCategoricalCrossentropy(from_logits=False)
+        
+        for epoch in range(self.local_epochs):
+            for step, (x_batch_train, y_batch_train) in enumerate(train_dataset):
+                with tf.GradientTape() as tape:
+                    logits = self.model(x_batch_train, training=True)
+                    
+                    # Original Loss
+                    loss_value = loss_fn(y_batch_train, logits)
+                    
+                    # Proximal Term
+                    proximal_term = 0.0
+                    
+                    # Iterate and compute L2 loss using aligned trainable arrays
+                    for i, w in enumerate(self.model.trainable_variables):
+                        proximal_term += tf.nn.l2_loss(w - global_trainable_weights[i])
+                        
+                    loss_value += (mu / 2.0) * proximal_term
+                    
+                grads = tape.gradient(loss_value, self.model.trainable_variables)
+                optimizer.apply_gradients(zip(grads, self.model.trainable_variables))
+                
+        # Evaluate on validation to set local metrics
+        val_loss, val_acc = self.model.evaluate(self.X_val, self.y_val, verbose=0)
+        return val_loss, val_acc
 
     def _train_fedprox(self, global_weights):
         """

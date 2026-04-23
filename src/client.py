@@ -48,7 +48,7 @@ class FLIPSClient:
             'current_round': 0
         }
 
-        print(f"Client {self.client_id} round {self.round_track['current_round']} of {self.round_track['max_rounds']}, initialized with {self.num_samples} samples.")
+        #print(f"Client {self.client_id} round {self.round_track['current_round']} of {self.round_track['max_rounds']}, initialized with {self.num_samples} samples.")
 
         # Clone model for this client
         self.old_model = None # para manter modelo antigo e usar em delta coding

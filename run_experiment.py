@@ -12,6 +12,12 @@ import json
 from pathlib import Path
 from datetime import datetime
 
+#avoiding log clutter from tensorflow with gpu
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+#avoiding to  use more than one gpu
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+
+
 # Add src to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
@@ -20,7 +26,6 @@ from data import load_cifar100_noniid
 from client import FLIPSClient
 from server import FLIPSServer
 from simulation import run_federated_learning
-
 
 def load_config(config_path='configs/config.yaml'):
     """Load configuration from YAML file."""
@@ -93,6 +98,17 @@ def main(args):
     np.random.seed(base_config['random_seed'])
     import tensorflow as tf
     tf.random.set_seed(base_config['random_seed'])
+
+    # GPU memory control
+
+    # Restrict TensorFlow to only take the VRAM it actually needs
+    gpus = tf.config.list_physical_devices('GPU')
+    if gpus:
+        try:
+            for gpu in gpus:
+                tf.config.experimental.set_memory_growth(gpu, True)
+        except RuntimeError as e:
+            print(e)
 
     # Load data ONCE so partitions are identical for comparison
     print("\nLoading and partitioning data (Shared across algorithms)...")

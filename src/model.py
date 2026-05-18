@@ -8,6 +8,7 @@ using batch normalization
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers
+from tensorflow.keras import regularizers
 
 
 def build_cnn(input_shape=(32, 32, 3), num_classes=100):
@@ -28,114 +29,40 @@ def build_cnn(input_shape=(32, 32, 3), num_classes=100):
     Returns:
         Keras model
     """
+    # L2 regularization factor
+    reg = regularizers.l2(1e-4)
+    # He Normal initialization for ReLU networks
+    init = 'he_normal'
+
     model = keras.Sequential([
         # Layer 1: Conv32
         layers.Conv2D(32, (3, 3), activation='relu', padding='same',
+                     kernel_initializer=init, kernel_regularizer=reg,
                      input_shape=input_shape, name='conv1'),
         layers.MaxPooling2D((2, 2), name='pool1'),
 
         # Layer 2: Conv64
-        layers.Conv2D(64, (3, 3), activation='relu', padding='same', name='conv2'),
+        layers.Conv2D(64, (3, 3), activation='relu', padding='same', 
+                     kernel_initializer=init, kernel_regularizer=reg, name='conv2'),
         layers.MaxPooling2D((2, 2), name='pool2'),
 
         # Layer 3: Conv128
-        layers.Conv2D(128, (3, 3), activation='relu', padding='same', name='conv3'),
+        layers.Conv2D(128, (3, 3), activation='relu', padding='same', 
+                     kernel_initializer=init, kernel_regularizer=reg, name='conv3'),
         layers.MaxPooling2D((2, 2), name='pool3'),
 
         # Flatten
         layers.Flatten(name='flatten'),
 
         # Layer 4: FC256
-        layers.Dense(256, activation='relu', name='fc'),
+        layers.Dense(256, activation='relu', 
+                    kernel_initializer=init, kernel_regularizer=reg, name='fc'),
 
-        # Layer 5: Output (Softmax)
+        # Layer 5: Output (Softmax) - uses default Glorot since it's softmax, not ReLU
         layers.Dense(num_classes, activation='softmax', name='output')
     ], name='FLIPS_CNN')
 
     return model
-
-def bn_build_cnn(input_shape=(32, 32, 3), num_classes=100):
-    #uses Batch Normalization
-    model = keras.Sequential([
-        # Layer 1: Conv32
-        layers.Conv2D(32, (3, 3), padding='same', input_shape=input_shape, name='conv1'),
-        layers.BatchNormalization(),
-        layers.Activation('relu'),
-        layers.MaxPooling2D((2, 2), name='pool1'),
-        layers.Dropout(0.2),
-
-        # Layer 2: Conv64
-        layers.Conv2D(64, (3, 3), padding='same', name='conv2'),
-        layers.BatchNormalization(),
-        layers.Activation('relu'),
-        layers.MaxPooling2D((2, 2), name='pool2'),
-        layers.Dropout(0.3),
-
-        # Layer 3: Conv128
-        layers.Conv2D(128, (3, 3), padding='same', name='conv3'),
-        layers.BatchNormalization(),
-        layers.Activation('relu'),
-        layers.MaxPooling2D((2, 2), name='pool3'),
-        layers.Dropout(0.4),
-
-        # Flatten
-        layers.Flatten(name='flatten'),
-
-        # Layer 4: FC256
-        layers.Dense(256, name='fc'),
-        layers.BatchNormalization(),
-        layers.Activation('relu'),
-        layers.Dropout(0.5),
-
-        # Layer 5: Output
-        layers.Dense(num_classes, activation='softmax', name='output')
-    ], name='FLIPS_CNN_Robust')
-
-    return model
-
-def LN_build_cnn(input_shape=(32, 32, 3), num_classes=100):
-    """
-    Robust VGG-style CNN for FLIPS.
-    Uses LayerNormalization to avoid breaking delta coding pipelines 
-    (no non-trainable moving statistics).
-    """
-    model = keras.Sequential([
-        # Block 1
-        layers.Conv2D(64, (3, 3), padding='same', input_shape=input_shape, name='conv1'),
-        layers.LayerNormalization(axis=-1, name='ln1'),
-        layers.Activation('relu'),
-        layers.MaxPooling2D((2, 2), name='pool1'),
-        layers.Dropout(0.2),
-
-        # Block 2
-        layers.Conv2D(128, (3, 3), padding='same', name='conv2'),
-        layers.LayerNormalization(axis=-1, name='ln2'),
-        layers.Activation('relu'),
-        layers.MaxPooling2D((2, 2), name='pool2'),
-        layers.Dropout(0.3),
-
-        # Block 3
-        layers.Conv2D(256, (3, 3), padding='same', name='conv3'),
-        layers.LayerNormalization(axis=-1, name='ln3'),
-        layers.Activation('relu'),
-        layers.MaxPooling2D((2, 2), name='pool3'),
-        layers.Dropout(0.4),
-
-        # Flatten & Dense Classifier
-        layers.Flatten(name='flatten'),
-        
-        # Increased dense capacity for 100 classes
-        layers.Dense(512, name='fc1'), 
-        layers.LayerNormalization(axis=-1, name='ln4'),
-        layers.Activation('relu'),
-        layers.Dropout(0.5),
-
-        # Output
-        layers.Dense(num_classes, activation='softmax', name='output')
-    ], name='FLIPS_CNN_LayerNorm')
-
-    return model
-
 
 
 
@@ -151,7 +78,7 @@ def compile_model(model, learning_rate=0.01):
         Compiled model
     """
     model.compile(
-        optimizer=keras.optimizers.SGD(learning_rate=learning_rate),
+        optimizer=keras.optimizers.AdamW(learning_rate=0.001, weight_decay=1e-4),
         loss='sparse_categorical_crossentropy',
         metrics=['accuracy']
     )

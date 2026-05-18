@@ -9,3 +9,10 @@ wheels/
 # Virtual environments
 .venv
 flips/
+
+# Needed fixes
+libdevice.10.bc
+
+# Additional folders
+result_stash/
+res_stash

@@ -107,7 +107,7 @@ class FLIPSServer:
             
             local_weights, num_samples, importance, size, deltas_dictionary = client.train_local(
                 self.global_weights, 
-                active_indices=active_indices
+                active_indices=active_indices, round_num=round_num
             )
             
             # If size is 0 (uncompressed fedavg), estimate raw size
@@ -131,7 +131,7 @@ class FLIPSServer:
         #Setup server side compression comparison, setting up as to avoid changing the 
         # flow of the code
 
-        self.server_size_comparison(client_updates)
+        self.server_size_comparison(client_updates, round_num)
 
 
 
@@ -198,7 +198,7 @@ class FLIPSServer:
 
         return metrics
     
-    def server_size_comparison(self, client_updates):
+    def server_size_comparison(self, client_updates, round_num=0):
 
         for client_id, update in client_updates.items():
             # for each client, mirrors the compression comparison done on the client side
@@ -227,7 +227,7 @@ class FLIPSServer:
 
             compression_info = {
                 'algorithm': self.config.get('algorithm', 'Indefinido'),
-                'round': self.round_metrics[-1]['round'] if self.round_metrics else 0,
+                'round': round_num,
                 'client_id': client_id,
                 'standard_size_bytes': standard_size_bytes,
                 'delta_size_bytes': delta_size_bytes,

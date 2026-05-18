@@ -1,0 +1,66 @@
+{
+    "flips": [
+        {
+            "round": 0,
+            "test_accuracy": 0.040300000458955765,
+            "test_loss": 4.466795921325684,
+            "num_selected_clients": 3,
+            "avg_compression_bytes": 1046092.6666666666,
+            "avg_local_accuracy": 0.1475864996512731,
+            "delta_accuracy": 0.0406000018119812,
+            "delta_loss": 4.466437339782715
+        },
+        {
+            "round": 1,
+            "test_accuracy": 0.08730000257492065,
+            "test_loss": 4.282254695892334,
+            "num_selected_clients": 3,
+            "avg_compression_bytes": 1033023.0,
+            "avg_local_accuracy": 0.20372770726680756,
+            "delta_accuracy": 0.08749999850988388,
+            "delta_loss": 4.282688140869141
+        },
+        {
+            "round": 2,
+            "test_accuracy": 0.12620000541210175,
+            "test_loss": 3.9345955848693848,
+            "num_selected_clients": 3,
+            "avg_compression_bytes": 1025012.6666666666,
+            "avg_local_accuracy": 0.24529467523097992,
+            "delta_accuracy": 0.12610000371932983,
+            "delta_loss": 3.934382438659668
+        }
+    ],
+    "fedavg": [
+        {
+            "round": 0,
+            "test_accuracy": 0.04729999974370003,
+            "test_loss": 4.372594356536865,
+            "num_selected_clients": 3,
+            "avg_compression_bytes": 2573968.0,
+            "avg_local_accuracy": 0.1575562208890915,
+            "delta_accuracy": 0.04729999974370003,
+            "delta_loss": 4.372644424438477
+        },
+        {
+            "round": 1,
+            "test_accuracy": 0.09510000050067902,
+            "test_loss": 4.081330299377441,
+            "num_selected_clients": 3,
+            "avg_compression_bytes": 2573968.0,
+            "avg_local_accuracy": 0.21999100844065347,
+            "delta_accuracy": 0.09510000050067902,
+            "delta_loss": 4.0816521644592285
+        },
+        {
+            "round": 2,
+            "test_accuracy": 0.14710000157356262,
+            "test_loss": 3.7353694438934326,
+            "num_selected_clients": 3,
+            "avg_compression_bytes": 2573968.0,
+            "avg_local_accuracy": 0.25746282935142517,
+            "delta_accuracy": 0.1468999981880188,
+            "delta_loss": 3.73504376411438
+        }
+    ]
+}

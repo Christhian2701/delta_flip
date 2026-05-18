@@ -181,7 +181,7 @@ class FLIPSClient:
         val_loss, val_acc = self.model.evaluate(self.X_val, self.y_val, verbose=0)
         return val_loss, val_acc
 
-    def train_local(self, global_weights, active_indices=None):
+    def train_local(self, global_weights, active_indices=None, round_num=0):
         """
         Perform local training and FLIPS specific operations.
         
@@ -211,7 +211,7 @@ class FLIPSClient:
             #print("RETURN ON FEDPROX IMPLEMENTATION")
 
             try:
-                _, deltas_dictionary = self.quantize_and_compress()
+                _, deltas_dictionary = self.quantize_and_compress(round_num)
             except Exception as e:
                 print(f"Error during quantization/compression for client {self.client_id}: {e}")
                 deltas_dictionary = None
@@ -246,7 +246,7 @@ class FLIPSClient:
             #print("RETURN ON Standard FedAvg") 
 
             try:
-                _, deltas_dictionary = self.quantize_and_compress()
+                _, deltas_dictionary = self.quantize_and_compress(round_num)
             except Exception as e:
                 print(f"Error during quantization/compression for client {self.client_id}: {e}")
                 deltas_dictionary = None
@@ -282,7 +282,7 @@ class FLIPSClient:
         pruning_ratio = self.prune_model(importance_scores, self.contact_time)
         
         # Phase 2: Quantization & Compression
-        compressed_size, deltas_dictionary = self.quantize_and_compress()
+        compressed_size, deltas_dictionary = self.quantize_and_compress(round_num)
 
         # Return updated weights
         local_weights = self.model.get_weights()
@@ -479,7 +479,7 @@ class FLIPSClient:
 
     
     
-    def quantize_and_compress(self):
+    def quantize_and_compress(self, round_num=0):
         """
         Phase 2: Quantize weights (float32 -> int8) + Gzip.
         Returns serialized size in bytes.
@@ -518,8 +518,8 @@ class FLIPSClient:
         serialized = pickle.dumps(quantized_weights)
         compressed = gzip.compress(serialized)
         original_size_bytes = len(compressed)
-
-        self.comparison(original_size_bytes, delta_size_bytes)
+         
+        self.comparison(original_size_bytes, delta_size_bytes, round_num)
         
         return len(compressed), deltas_dictionary
 
@@ -593,14 +593,14 @@ class FLIPSClient:
 
         return encoded
 
-    def comparison(self, bytes_original, bytes_delta):
+    def comparison(self, bytes_original, bytes_delta, round_num):
 
         if bytes_original > 0:
             reduction_percent = (1 - (bytes_delta / bytes_original)) * 100
         else:
             reduction_percent = 0.0
 
-        current_round = self.round_track.get('current_round', 0)
+        current_round = round_num
 
         compression_info ={
             'algorithm': self.config.get('algorithm', 'Indefinido'),
@@ -615,7 +615,7 @@ class FLIPSClient:
         log_message = (
             f"Client {self.client_id} | "
             f"Algorithm: {self.config.get('algorithm')} | "
-            f"Round: {self.config.get('current_round', 0)} | "
+            f"Round: {current_round} | "
             f"Original Size: {bytes_original} bytes | "
             f"Delta RLE Size: {bytes_delta} bytes | "
             f"Reduction: {reduction_percent:.2f}%\n"
@@ -639,6 +639,5 @@ class FLIPSClient:
         # Using 'a' mode to append, so it records every client in every round
         with open("compression_comparison_log.txt", "a") as log_file:
             log_file.write(log_message)
-        
-        self.round_track['current_round'] += 1
+
     

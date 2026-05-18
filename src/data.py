@@ -6,6 +6,7 @@ Implements CIFAR-100 loading with Dirichlet non-IID partitioning
 import numpy as np
 import tensorflow as tf
 from tensorflow import keras
+from tensorflow.keras import layers
 
 
 def load_cifar100():
@@ -170,6 +171,60 @@ def load_cifar100_noniid(num_clients=50, alpha=0.5, seed=42):
     print(f"  Max samples: {max(stats['samples_per_client'])}")
 
     return client_data, (X_test, y_test), stats
+
+def get_data_augmentation():
+    """
+    Defines the augmentation pipeline suitable for vehicles/CIFAR.
+    Does not use vertical flips to maintain physical realism.
+    """
+    return keras.Sequential([
+        layers.RandomFlip("horizontal"),
+        layers.RandomTranslation(height_factor=0.1, width_factor=0.1),
+        layers.RandomZoom(height_factor=(-0.1, 0.1)),
+    ], name="data_augmentation")
+
+
+def create_tf_datasets(client_data_dict, batch_size=32, augment=True):
+    """
+    Converts the raw NumPy arrays into tf.data.Dataset objects 
+    and applies on-the-fly data augmentation to the training sets.
+    
+    Args:
+        client_data_dict: The dictionary output from partition_data_dirichlet
+        batch_size: Training batch size
+        augment: Whether to apply augmentation to the training data
+        
+    Returns:
+        A dictionary with the same client IDs, but containing tf.data.Dataset objects
+    """
+    data_augmentation = get_data_augmentation()
+    tf_client_data = {}
+    
+    for client_id, data in client_data_dict.items():
+        # 1. Create Training Dataset
+        train_ds = tf.data.Dataset.from_tensor_slices((data['X_train'], data['y_train']))
+        train_ds = train_ds.shuffle(buffer_size=1024).batch(batch_size)
+        
+        if augment:
+            # Apply augmentation ONLY to the training dataset
+            train_ds = train_ds.map(
+                lambda x, y: (data_augmentation(x, training=True), y),
+                num_parallel_calls=tf.data.AUTOTUNE
+            )
+            
+        train_ds = train_ds.prefetch(tf.data.AUTOTUNE)
+        
+        # 2. Create Validation Dataset (NO augmentation)
+        val_ds = tf.data.Dataset.from_tensor_slices((data['X_val'], data['y_val']))
+        val_ds = val_ds.batch(batch_size).prefetch(tf.data.AUTOTUNE)
+        
+        tf_client_data[client_id] = {
+            'train_ds': train_ds,
+            'val_ds': val_ds,
+            'num_samples': data['num_samples']
+        }
+        
+    return tf_client_data
 
 
 if __name__ == "__main__":

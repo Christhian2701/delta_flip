@@ -15,12 +15,8 @@ def build_cnn(input_shape=(32, 32, 3), num_classes=100):
     """
     Build 5-layer CNN as specified in FLIPS paper.
 
-    Architecture:
-    - Conv1: 32 filters, 3x3, ReLU, MaxPool 2x2
-    - Conv2: 64 filters, 3x3, ReLU, MaxPool 2x2
-    - Conv3: 128 filters, 3x3, ReLU, MaxPool 2x2
-    - FC: 256 neurons, ReLU
-    - Output: num_classes neurons, Softmax
+    Architecture: # mudança
+
 
     Args:
         input_shape: Input image shape (default: 32x32x3 for CIFAR-100)
@@ -29,38 +25,40 @@ def build_cnn(input_shape=(32, 32, 3), num_classes=100):
     Returns:
         Keras model
     """
-    # L2 regularization factor
     reg = regularizers.l2(1e-4)
-    # He Normal initialization for ReLU networks
     init = 'he_normal'
 
     model = keras.Sequential([
-        # Layer 1: Conv32
-        layers.Conv2D(32, (3, 3), activation='relu', padding='same',
+        # Layer 1: Conv64 (Widened)
+        layers.Conv2D(64, (3, 3), activation='relu', padding='same',
                      kernel_initializer=init, kernel_regularizer=reg,
                      input_shape=input_shape, name='conv1'),
         layers.MaxPooling2D((2, 2), name='pool1'),
+        layers.Dropout(0.2, name='drop1'), # 0 parameters, won't affect deltas!
 
-        # Layer 2: Conv64
-        layers.Conv2D(64, (3, 3), activation='relu', padding='same', 
+        # Layer 2: Conv128 (Widened)
+        layers.Conv2D(128, (3, 3), activation='relu', padding='same', 
                      kernel_initializer=init, kernel_regularizer=reg, name='conv2'),
         layers.MaxPooling2D((2, 2), name='pool2'),
+        layers.Dropout(0.3, name='drop2'),
 
-        # Layer 3: Conv128
-        layers.Conv2D(128, (3, 3), activation='relu', padding='same', 
+        # Layer 3: Conv256 (Widened)
+        layers.Conv2D(256, (3, 3), activation='relu', padding='same', 
                      kernel_initializer=init, kernel_regularizer=reg, name='conv3'),
         layers.MaxPooling2D((2, 2), name='pool3'),
+        layers.Dropout(0.4, name='drop3'),
 
         # Flatten
         layers.Flatten(name='flatten'),
 
-        # Layer 4: FC256
-        layers.Dense(256, activation='relu', 
+        # Layer 4: FC512 (Widened to handle more features)
+        layers.Dense(512, activation='relu', 
                     kernel_initializer=init, kernel_regularizer=reg, name='fc'),
+        layers.Dropout(0.5, name='drop_fc'),
 
-        # Layer 5: Output (Softmax) - uses default Glorot since it's softmax, not ReLU
+        # Layer 5: Output
         layers.Dense(num_classes, activation='softmax', name='output')
-    ], name='FLIPS_CNN')
+    ], name='FLIPS_CNN_WIDER')
 
     return model
 

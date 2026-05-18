@@ -1,5 +1,8 @@
 """
+alteração de modelo
 FLIPS Client implementation.
+
+MODIFIDAÇÕES FEITAS AQUI
 """
 import numpy as np
 import tensorflow as tf
@@ -9,6 +12,9 @@ import gzip
 import pickle
 import sys
 import copy
+import math
+import os
+import csv
 
 class FLIPSClient:
     """
@@ -36,14 +42,26 @@ class FLIPSClient:
         self.y_val = data['y_val']
         self.num_samples = len(self.y_train)
 
+        #adding round tracking for compression analysis
+        self.round_track = {
+            'max_rounds' : config.get('num_rounds', 10),
+            'algorithm': config.get('algorithm'),
+            'current_round': 0
+        }
+
+        #print(f"Client {self.client_id} round {self.round_track['current_round']} of {self.round_track['max_rounds']}, initialized with {self.num_samples} samples.")
+
         # Clone model for this client
-        self.model = keras.models.clone_model(model)
+        self.old_model = None # para manter modelo antigo e usar em delta coding
+        #self.model = keras.models.clone_model(model)
+        self.model = model
         self.model.set_weights(model.get_weights())
         self.model.compile(
             optimizer=keras.optimizers.SGD(learning_rate=config['learning_rate']),
             loss='sparse_categorical_crossentropy',
             metrics=['accuracy']
         )
+        
 
         # Configuration
         self.config = config
@@ -75,6 +93,49 @@ class FLIPSClient:
         term3 = g3 * self.contact_time
         
         return min(1.0, term1 + term2 + term3)
+    
+    def bn_train_fedprox(self, global_weights):
+        """
+        FedProx Local Training: L(w) + (mu/2) * ||w - w^t||^2
+        """
+        mu = self.config.get('mu', 0.01)
+        optimizer = keras.optimizers.SGD(learning_rate=self.config['learning_rate'])
+        
+        # FIX: Snapshot the global trainable weights directly from the model.
+        # Since self.model.set_weights(global_weights) was called right before this,
+        # self.model.trainable_variables currently holds the exact global trainable weights.
+        # We use tf.identity to create a detached copy of these tensors for the loss calculation.
+        global_trainable_weights = [tf.identity(w) for w in self.model.trainable_variables]
+
+        # Prepare dataset
+        train_dataset = tf.data.Dataset.from_tensor_slices((self.X_train, self.y_train))
+        train_dataset = train_dataset.shuffle(buffer_size=1024).batch(self.batch_size)
+        
+        loss_fn = keras.losses.SparseCategoricalCrossentropy(from_logits=False)
+        
+        for epoch in range(self.local_epochs):
+            for step, (x_batch_train, y_batch_train) in enumerate(train_dataset):
+                with tf.GradientTape() as tape:
+                    logits = self.model(x_batch_train, training=True)
+                    
+                    # Original Loss
+                    loss_value = loss_fn(y_batch_train, logits)
+                    
+                    # Proximal Term
+                    proximal_term = 0.0
+                    
+                    # Iterate and compute L2 loss using aligned trainable arrays
+                    for i, w in enumerate(self.model.trainable_variables):
+                        proximal_term += tf.nn.l2_loss(w - global_trainable_weights[i])
+                        
+                    loss_value += (mu / 2.0) * proximal_term
+                    
+                grads = tape.gradient(loss_value, self.model.trainable_variables)
+                optimizer.apply_gradients(zip(grads, self.model.trainable_variables))
+                
+        # Evaluate on validation to set local metrics
+        val_loss, val_acc = self.model.evaluate(self.X_val, self.y_val, verbose=0)
+        return val_loss, val_acc
 
     def _train_fedprox(self, global_weights):
         """
@@ -120,14 +181,17 @@ class FLIPSClient:
         val_loss, val_acc = self.model.evaluate(self.X_val, self.y_val, verbose=0)
         return val_loss, val_acc
 
-    def train_local(self, global_weights, active_indices=None):
+    def train_local(self, global_weights, active_indices=None, round_num=0):
         """
         Perform local training and FLIPS specific operations.
         
         Args:
             global_weights: List of numpy arrays
             active_indices: Optional list of indices to return updates for (FedLama)
-        """
+        """ 
+        # os pesos do modelo global são salvos a parte pra usar delta coding
+        self.old_model = [np.copy(w) for w in global_weights]
+
         # Set global weights
         self.model.set_weights(global_weights)
 
@@ -142,8 +206,17 @@ class FLIPSClient:
             local_weights = self.model.get_weights()
             if active_indices is not None:
                 local_weights = [w if i in active_indices else None for i, w in enumerate(local_weights)]
-                
-            return local_weights, self.num_samples, {}, 0
+
+            
+            #print("RETURN ON FEDPROX IMPLEMENTATION")
+
+            try:
+                _, deltas_dictionary = self.quantize_and_compress(round_num)
+            except Exception as e:
+                print(f"Error during quantization/compression for client {self.client_id}: {e}")
+                deltas_dictionary = None
+
+            return local_weights, self.num_samples, {}, 0, deltas_dictionary
             
         # Standard FedAvg / FLIPS training
         # Train locally
@@ -154,6 +227,14 @@ class FLIPSClient:
             epochs=self.local_epochs,
             verbose=0,
             validation_data=(self.X_val, self.y_val)
+        )
+
+        #new one
+        history = self.model.fit(
+            x=self.data['train_ds'], 
+            validation_data=self.data['val_ds'],
+            verbose=0,
+            epochs=self.config['epochs']
         )
 
         # Update metrics
@@ -169,8 +250,25 @@ class FLIPSClient:
             if active_indices is not None:
                 local_weights = [w if i in active_indices else None for i, w in enumerate(local_weights)]
             
-            # Return empty importance/metrics for consistent signature
-            return local_weights, self.num_samples, {}, 0 # 0 compressed size (raw)
+            # Return empty importance/metrics for consistent signature            
+            #print("RETURN ON Standard FedAvg") 
+
+            try:
+                _, deltas_dictionary = self.quantize_and_compress(round_num)
+            except Exception as e:
+                print(f"Error during quantization/compression for client {self.client_id}: {e}")
+                deltas_dictionary = None
+            #else:
+                #print(f"Quantization and compression successful for client {self.client_id}")
+            
+
+            return local_weights, self.num_samples, {}, 0, deltas_dictionary # 0 compressed size (raw)
+
+
+        # Note on Fedbuff, the algorithm doesn't have an specific local training procedure, instead it runs just as flips (Phase 2 and Phase 3), will leave as such, but worth looking into for what was the intention in te article
+
+        # FedBuff Baseline check (to be done)
+        #algorithm = self.config.get('algorithm', 'fedbuff')
 
         # Phase 2: Compute Importance & Apply Context (Eq. 292)
         omega = self.get_context_factor()
@@ -192,12 +290,14 @@ class FLIPSClient:
         pruning_ratio = self.prune_model(importance_scores, self.contact_time)
         
         # Phase 2: Quantization & Compression
-        compressed_size = self.quantize_and_compress()
+        compressed_size, deltas_dictionary = self.quantize_and_compress(round_num)
 
         # Return updated weights
         local_weights = self.model.get_weights()
 
-        return local_weights, self.num_samples, importance_scores, compressed_size
+        #print(f'INFO on delta_dictionary for client {self.client_id}:{list(deltas_dictionary.keys()) if deltas_dictionary else "No deltas"}')
+
+        return local_weights, self.num_samples, importance_scores, compressed_size, deltas_dictionary
 
     def compute_shap_importance(self):
         """
@@ -384,13 +484,35 @@ class FLIPSClient:
     
     # onde melhor colocar o delta coding
     # tem que manter o modelo antigo para manter o delta
+
     
-    def quantize_and_compress(self):
+    
+    def quantize_and_compress(self, round_num=0):
         """
         Phase 2: Quantize weights (float32 -> int8) + Gzip.
         Returns serialized size in bytes.
         """
         weights = self.model.get_weights()
+        # adição para delta coding
+        old_weights = self.old_model if self.old_model is not None else [np.zeros_like(w) for w in weights]
+
+        deltas = self.get_deltas(old_weights, weights)
+
+        deltas_dictionary = self.get_flat(deltas)
+
+        deltas_dictionary['vector'], deltas_dictionary['scale'] = self.uniform_quantization(deltas_dictionary['vector'])
+
+        encoded_deltas = self.rle_encoding(deltas_dictionary['vector'])
+
+        deltas_dictionary['vector'] = encoded_deltas
+
+            # preparo para comparação de compressão 
+
+        delta_serialized = pickle.dumps(deltas_dictionary)
+        delta_compressed = gzip.compress(delta_serialized)
+        delta_size_bytes = len(delta_compressed)
+
+        # fim delta coding
         
         # Quantization Simulation (casting)
         # In real deployment: tf.quantization.quantize
@@ -403,10 +525,127 @@ class FLIPSClient:
         # Serialize
         serialized = pickle.dumps(quantized_weights)
         compressed = gzip.compress(serialized)
+        original_size_bytes = len(compressed)
+         
+        self.comparison(original_size_bytes, delta_size_bytes, round_num)
         
-        return len(compressed)
+        return len(compressed), deltas_dictionary
 
     def evaluate(self, X_test, y_test):
         """Evaluate model on test set."""
         loss, accuracy = self.model.evaluate(X_test, y_test, verbose=0)
         return loss, accuracy
+
+    # métodos para delta coding
+
+    def get_deltas(self, global_weights, new_weights):
+
+        return [new_w - old_w for new_w, old_w in zip(new_weights, global_weights)]
+
+
+    def get_flat(self, weights):
+        tensors = []
+
+        metadata = {}
+
+        for index, layer in enumerate(weights):
+            metadata[index] = {
+                'shape': layer.shape,
+                'size': layer.size
+            }
+
+            tensors.append(layer.flatten())
+
+        deltas_flat = {
+            'vector': np.concatenate(tensors),
+            'metadata': metadata
+        }
+
+        return deltas_flat
+
+    def uniform_quantization(self, vector):
+        """Uniform quantization of deltas."""
+
+        max_abs  =  np.max(np.abs(vector))
+        scale = max_abs / 127.0
+        
+        result = np.clip(np.round(vector / scale), -127, 127).astype(np.int8)
+
+        return result, scale
+
+    def rle_encoding(self, values):
+
+        sentinel =  -128
+        max_run = 127 # máximo de zeros seguidos para 8 bits
+
+        encoded = []
+
+        i, n = 0, len(values) # contadores para iteração
+
+        while i < n:
+            if abs(values[i]) == 0:
+                sequence_length = 0
+                while i < n and abs(values[i]) == 0:
+                    sequence_length += 1
+                    i += 1
+                
+                # quebra a sequência pra caber no tipo de vetor (int8)
+                while sequence_length > 0:
+                    chunk = min(sequence_length, max_run)
+                    encoded.append(sentinel)
+                    encoded.append(chunk)
+                    sequence_length -= chunk
+            else:
+                encoded.append(values[i])
+                i += 1
+
+        return encoded
+
+    def comparison(self, bytes_original, bytes_delta, round_num):
+
+        if bytes_original > 0:
+            reduction_percent = (1 - (bytes_delta / bytes_original)) * 100
+        else:
+            reduction_percent = 0.0
+
+        current_round = round_num
+
+        compression_info ={
+            'algorithm': self.config.get('algorithm', 'Indefinido'),
+            'round': current_round,
+            'client_id': self.client_id,
+            'original_size_bytes': bytes_original,
+            'delta_size_bytes': bytes_delta,
+            'reduction_percent': reduction_percent
+        }
+
+        #originalmente usava só log_message
+        log_message = (
+            f"Client {self.client_id} | "
+            f"Algorithm: {self.config.get('algorithm')} | "
+            f"Round: {current_round} | "
+            f"Original Size: {bytes_original} bytes | "
+            f"Delta RLE Size: {bytes_delta} bytes | "
+            f"Reduction: {reduction_percent:.2f}%\n"
+        )
+
+        csv_filename = "client_compression_track.csv"
+        file_exists = os.path.isfile(csv_filename)
+
+        with open(csv_filename, mode="a", newline="", encoding="utf-8") as csv_file:
+        
+            fieldnames = compression_info.keys()
+            writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
+            if not file_exists:
+                writer.writeheader()
+            writer.writerow(compression_info)
+        
+        # Print to console so you can see it running
+        #print(log_message.strip())
+
+        # Append to a text file for later analysis
+        # Using 'a' mode to append, so it records every client in every round
+        with open("compression_comparison_log.txt", "a") as log_file:
+            log_file.write(log_message)
+
+    

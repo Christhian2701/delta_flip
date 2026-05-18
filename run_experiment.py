@@ -22,7 +22,7 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
 from model import build_cnn, compile_model
-from data import load_cifar100_noniid
+from data import create_tf_datasets, load_cifar100_noniid
 from client import FLIPSClient
 from server import FLIPSServer
 from simulation import run_federated_learning
@@ -112,11 +112,14 @@ def main(args):
 
     # Load data ONCE so partitions are identical for comparison
     print("\nLoading and partitioning data (Shared across algorithms)...")
-    client_data, test_data, stats = load_cifar100_noniid(
+
+    raw_client_data, test_data, stats = load_cifar100_noniid(
         num_clients=base_config['num_clients'],
         alpha=base_config['alpha_dirichlet'],
         seed=base_config['random_seed']
     )
+
+    tf_client_datasets = create_tf_datasets(raw_client_data, batch_size=32, augment=True)
     
     # Init Results Storage
     results = {}
@@ -142,7 +145,7 @@ def main(args):
         
         # Re-initialize clients with same data
         clients = []
-        for client_id, data in client_data.items():
+        for client_id, data in tf_client_datasets.items():
             client = FLIPSClient(client_id, data, model, run_config)
             clients.append(client)
             

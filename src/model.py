@@ -34,19 +34,19 @@ def build_cnn(input_shape=(32, 32, 3), num_classes=100):
                      kernel_initializer=init, kernel_regularizer=reg,
                      input_shape=input_shape, name='conv1'),
         layers.MaxPooling2D((2, 2), name='pool1'),
-        layers.Dropout(0.2, name='drop1'), # 0 parameters, won't affect deltas!
+        layers.Dropout(0.1, name='drop1'), # 0 parameters, won't affect deltas!
 
         # Layer 2: Conv128 (Widened)
         layers.Conv2D(128, (3, 3), activation='relu', padding='same', 
                      kernel_initializer=init, kernel_regularizer=reg, name='conv2'),
         layers.MaxPooling2D((2, 2), name='pool2'),
-        layers.Dropout(0.3, name='drop2'),
+        layers.Dropout(0.1, name='drop2'),
 
         # Layer 3: Conv256 (Widened)
         layers.Conv2D(256, (3, 3), activation='relu', padding='same', 
                      kernel_initializer=init, kernel_regularizer=reg, name='conv3'),
         layers.MaxPooling2D((2, 2), name='pool3'),
-        layers.Dropout(0.4, name='drop3'),
+        layers.Dropout(0.2, name='drop3'),
 
         # Flatten
         layers.Flatten(name='flatten'),
@@ -54,7 +54,7 @@ def build_cnn(input_shape=(32, 32, 3), num_classes=100):
         # Layer 4: FC512 (Widened to handle more features)
         layers.Dense(512, activation='relu', 
                     kernel_initializer=init, kernel_regularizer=reg, name='fc'),
-        layers.Dropout(0.5, name='drop_fc'),
+        layers.Dropout(0.3, name='drop_fc'),
 
         # Layer 5: Output
         layers.Dense(num_classes, activation='softmax', name='output')

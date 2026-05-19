@@ -47,7 +47,9 @@ class FLIPSClient:
         self.model = model
         self.model.set_weights(model.get_weights())
         self.model.compile(
-            optimizer=keras.optimizers.SGD(learning_rate=config['learning_rate']),
+            optimizer=keras.optimizers.SGD(learning_rate=config['learning_rate'],
+            momentum=0.9,
+            nesterov=True),
             loss='sparse_categorical_crossentropy',
             metrics=['accuracy']
         )
@@ -87,7 +89,9 @@ class FLIPSClient:
         FedProx Local Training: L(w) + (mu/2) * ||w - w^t||^2
         """
         mu = self.config.get('mu', 0.01)
-        optimizer = keras.optimizers.SGD(learning_rate=self.config['learning_rate'])
+        optimizer = keras.optimizers.SGD(learning_rate=self.config['learning_rate'],
+        momentum=0.9,
+        nesterov=True)
         
         global_kernel_weights = [tf.convert_to_tensor(w) for w in global_weights]
         loss_fn = keras.losses.SparseCategoricalCrossentropy(from_logits=False)

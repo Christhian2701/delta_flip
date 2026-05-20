@@ -14,6 +14,7 @@ import gzip
 import pickle
 import os
 import csv
+import math
 
 from tensorflow import keras
 
@@ -39,15 +40,27 @@ class FLIPSServer:
         self.config = config
         self.num_rounds = config['num_rounds']
         self.clients_per_round = config['clients_per_round']
-        self.delta_model = keras.models.clone_model(model)  
+        self.delta_model = keras.models.clone_model(model)
+        self.server_momentum = config.get('server_momentum', 0.9)
+        self.initial_lr = config.get('learning_rate', 0.01)
 
         # Metrics tracking
         self.round_metrics = []
         self.global_weights = model.get_weights()
         self.delta_weights = model.get_weights()
+
+        # Vetor de velocidade para o uso de momentum
+        self.global_velocity = [np.zeros_like(w) for w in self.global_weights]
         
         # Initialize Aggregator Strategy
         self.aggregator = self._get_aggregator()
+
+    @staticmethod #tentando rodar passar lr_decay pro client
+    def get_cosine_lr(current_round, max_rounds, lr_max=0.01, lr_min=0.001):
+        """Calculates the decayed learning rate for the current round."""
+        progress = current_round / max_rounds
+        cosine_decay = 0.5 * (1 + math.cos(math.pi * progress))
+        return lr_min + (lr_max - lr_min) * cosine_decay
 
     def _get_aggregator(self):
         algo = self.config.get('algorithm', 'flips')
@@ -99,10 +112,18 @@ class FLIPSServer:
         # Client updates
         client_updates = {} # Changed to dictionary for easier access by client_id
         total_compressed_size = 0
+
+        current_lr = self.get_cosine_lr(round_num, self.num_rounds, lr_max=self.initial_lr)
+
+        #self.config['learning_rate'] = current_lr
         
         for client in selected_clients:
             # Phase 2 & 3: Get contact time from client propery
             # In Phase 3 this comes from vehicle mobility and is set before calling run_round
+
+            #tentando forçar update no keras
+            keras.backend.set_value(client.model.optimizer.learning_rate, current_lr)
+
             contact_time = getattr(client, 'contact_time', 1.0)
             
             local_weights, num_samples, importance, size, deltas_dictionary = client.train_local(
@@ -153,20 +174,34 @@ class FLIPSServer:
         result = self.aggregator.aggregate(self, client_updates, round_num=round_num)
 
         if isinstance(result, tuple):
-            self.global_weights, self.delta_weights = result
+            #self.global_weights, self.delta_weights = result
+            aggregated_weights, self.delta_weights = result
             self.delta_model.set_weights(self.delta_weights)
             #print("DELTAS INDENTIFIED")
         else:
             #no deltas yet
             self.global_weights = result
             self.delta_model.set_weights(self.global_weights)
+
+        #adição de momentum no servidor
+
+        for i in range(len(self.global_weights)):
+            raw_step = aggregated_weights[i] - self.global_weights[i]
+
+            self.global_velocity[i] = (self.server_momentum * self.global_velocity[i]) + raw_step
+
+            self.global_weights[i] += self.global_velocity[i]
+
+        #ver se n precisa atualizar os pesos de delta
+
         
         # FedLama: Update intervals
         if isinstance(self.aggregator, FedLamaAggregator) and active_indices:
              self.aggregator.update_intervals(active_indices, round_num)
 
         # Update global model
-        self.global_model.set_weights(self.global_weights)
+        #self.global_model.set_weights(self.global_weights)
+        self.global_model.set_weights(self.global_weights) #mudança pra momentum
         #self.delta_model.set_weights(self.delta_weights)
 
         # Evaluate

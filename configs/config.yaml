@@ -7,6 +7,7 @@ num_rounds: 100
 local_epochs: 5
 batch_size: 32
 learning_rate: 0.01
+server_momentum: 0.9 # nova abordagem -  serve para diminuir o drift vindo das atualizações locais ao "manter uma aceleração na direção pré-estabelecida"
 
 # Data
 dataset: cifar100

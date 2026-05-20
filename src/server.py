@@ -122,7 +122,11 @@ class FLIPSServer:
             # In Phase 3 this comes from vehicle mobility and is set before calling run_round
 
             #tentando forçar update no keras
-            keras.backend.set_value(client.model.optimizer.learning_rate, current_lr)
+            #keras.backend.set_value(client.model.optimizer.learning_rate, current_lr)
+            try:
+                client.model.optimizer.learning_rate.assign(current_lr)
+            except AttributeError:
+                client.model.optimizer.learning_rate = current_lr
 
             contact_time = getattr(client, 'contact_time', 1.0)
             

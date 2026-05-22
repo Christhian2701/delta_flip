@@ -5,13 +5,17 @@ Conv32 → Conv64 → Conv128 → FC256 → Softmax100
 using batch normalization
 """
 
+# 
+
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers
 from tensorflow.keras import regularizers
 
 
-def build_cnn(input_shape=(32, 32, 3), num_classes=100):
+#def build_cnn(input_shape=(32, 32, 3), num_classes=100):
+# Mudança pra testar com CIFAR10
+def build_cnn(input_shape=(32, 32, 3), num_classes=10):
     """
     Build 5-layer CNN as specified in FLIPS paper.
 

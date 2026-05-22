@@ -16,7 +16,9 @@ def load_cifar100():
     Returns:
         (X_train, y_train), (X_test, y_test): Training and test data
     """
-    (X_train, y_train), (X_test, y_test) = keras.datasets.cifar100.load_data()
+    # 22/05/2026 - Mudança para testar com CIFAR10
+    #(X_train, y_train), (X_test, y_test) = keras.datasets.cifar100.load_data()
+    (X_train, y_train), (X_test, y_test) = keras.datasets.cifar10.load_data()
 
     # Normalize pixel values to [0, 1]
     X_train = X_train.astype('float32') / 255.0
@@ -29,7 +31,8 @@ def load_cifar100():
     return (X_train, y_train), (X_test, y_test)
 
 
-def partition_data_dirichlet(X, y, num_clients=50, alpha=0.5, num_classes=100, seed=42):
+#def partition_data_dirichlet(X, y, num_clients=50, alpha=0.5, num_classes=100, seed=42):
+def partition_data_dirichlet(X, y, num_clients=50, alpha=0.5, num_classes=10, seed=42):
     """
     Partition data using Dirichlet distribution for non-IID split.
 
@@ -93,8 +96,8 @@ def partition_data_dirichlet(X, y, num_clients=50, alpha=0.5, num_classes=100, s
 
     return client_data
 
-
-def get_data_statistics(client_data, num_classes=100):
+# mudança de 100 para 10 classe pro cifar10
+def get_data_statistics(client_data, num_classes=10):
     """
     Compute statistics about data distribution across clients.
 

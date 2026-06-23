@@ -51,6 +51,18 @@ class FLIPSServer:
 
         # Vetor de velocidade para o uso de momentum
         self.global_velocity = [np.zeros_like(w) for w in self.global_weights]
+
+        # 2206 -------
+        # adicionando para lidar com problemas do batchnorm e server momentum.
+
+        self.trainable_indices = []
+        trainable_names = [v.name for v in self.global_model.trainable_variables]
+
+        for i, var in enumerate(self.global_model.weights):
+            if var.name in trainable_names:
+                self.trainable_indices.append(i)
+
+        # 2206 -------
         
         # Initialize Aggregator Strategy
         self.aggregator = self._get_aggregator()
@@ -189,12 +201,24 @@ class FLIPSServer:
 
         #adição de momentum no servidor
 
-        for i in range(len(self.global_weights)):
+        '''for i in range(len(self.global_weights)):
             raw_step = aggregated_weights[i] - self.global_weights[i]
 
             self.global_velocity[i] = (self.server_momentum * self.global_velocity[i]) + raw_step
 
-            self.global_weights[i] += self.global_velocity[i]
+            self.global_weights[i] += self.global_velocity[i]'''
+        
+        for i in range(len(self.global_weights)):
+            if i in self.trainable_indices:
+                raw_step = aggregated_weights[i] - self.global_weights[i]
+                
+                self.global_velocity[i] = (self.server_momentum * self.global_velocity[i]) + raw_step
+
+                self.global_weights[i] = self.global_weights[i] + self.global_velocity[i]
+            else:
+                # Bypass momentum for Batch Normalization statistics
+                self.global_velocity[i] = np.zeros_like(self.global_velocity[i]) # Keep zero
+                self.global_weights[i] = aggregated_weights[i] # Just accept the raw variance
 
         #ver se n precisa atualizar os pesos de delta
 

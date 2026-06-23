@@ -92,8 +92,10 @@ class FLIPSClient:
         optimizer = keras.optimizers.SGD(learning_rate=self.config['learning_rate'],
         momentum=0.9,
         nesterov=True)
-        
-        global_kernel_weights = [tf.convert_to_tensor(w) for w in global_weights]
+
+        #commenting out to try and solve Batch Normalization issues
+        #global_kernel_weights = [tf.convert_to_tensor(w) for w in global_weights]
+        global_trainable_weights = [tf.identity(w) for w in self.model.trainable_variables]
         loss_fn = keras.losses.SparseCategoricalCrossentropy(from_logits=False)
         
         for epoch in range(self.local_epochs):
@@ -104,9 +106,11 @@ class FLIPSClient:
                     loss_value = loss_fn(y_batch_train, logits)
                     
                     proximal_term = 0.0
-                    for i, w in enumerate(self.model.trainable_variables):
-                        if i < len(global_kernel_weights):
-                            proximal_term += tf.nn.l2_loss(w - global_kernel_weights[i])
+                    #for i, w in enumerate(self.model.trainable_variables):
+                    #    if i < len(global_kernel_weights):
+                    for w_local, w_global in zip(self.model.trainable_variables, global_trainable_weights):
+                            proximal_term += tf.nn.l2_loss(w_local - w_global)
+                            #proximal_term += tf.nn.l2_loss(w - global_kernel_weights[i])
                         
                     loss_value += (mu / 2.0) * proximal_term
                     
@@ -224,7 +228,7 @@ class FLIPSClient:
 
         except Exception as e:
             print(f"Warning: Gradient-based SHAP computation failed: {e}")
-            layer_outputs = self._get_layer_outputs(sample_X)
+            layer_outputs = self._get_layer_outputs(sample_X, config=self.config)
 
             for layer_name, output in layer_outputs.items():
                 if output is not None:
@@ -240,14 +244,14 @@ class FLIPSClient:
 
         return layer_importance
 
-    def _get_layer_outputs(self, input_data):
+    def _get_layer_outputs(self, input_data, config):
         layer_outputs = {}
         for i, layer in enumerate(self.model.layers):
             if not layer.trainable_weights:
                 continue
             try:
                 intermediate_model = keras.Model(inputs=self.model.input, outputs=layer.output)
-                activations = intermediate_model.predict(input_data, verbose=0, batch_size=32)
+                activations = intermediate_model.predict(input_data, verbose=0, batch_size=config.get('batch_size', 32))
                 layer_outputs[layer.name] = activations
             except Exception as e:
                 continue

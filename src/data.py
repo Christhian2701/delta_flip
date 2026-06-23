@@ -9,16 +9,35 @@ from tensorflow import keras
 from tensorflow.keras import layers
 
 
-def load_cifar100():
+def load_dataset(dataset='cifar10'):
     """
-    Load CIFAR-100 dataset.
+    Load specified dataset.
 
     Returns:
         (X_train, y_train), (X_test, y_test): Training and test data
     """
     # 22/05/2026 - Mudança para testar com CIFAR10
-    #(X_train, y_train), (X_test, y_test) = keras.datasets.cifar100.load_data()
-    (X_train, y_train), (X_test, y_test) = keras.datasets.cifar10.load_data()
+
+    if dataset == 'cifar10':
+        (X_train, y_train), (X_test, y_test) = keras.datasets.cifar10.load_data()
+
+    elif dataset == 'cifar100':
+        (X_train, y_train), (X_test, y_test) = keras.datasets.cifar100.load_data()
+
+    elif dataset == 'fashion_mnist':
+        (X_train, y_train), (X_test, y_test) = keras.datasets.fashion_mnist.load_data()
+        
+        # 1. Pad images from 28x28 to 32x32 for VGG compatibility
+        X_train = np.pad(X_train, ((0,0), (2,2), (2,2)), 'constant')
+        X_test = np.pad(X_test, ((0,0), (2,2), (2,2)), 'constant')
+
+        # 2. Duplicate the 1 grayscale channel into 3 RGB channels
+        X_train = np.stack((X_train,)*3, axis=-1)
+        X_test = np.stack((X_test,)*3, axis=-1)
+
+    else:
+        raise ValueError(f"Unknown dataset: {dataset}")
+
 
     # Normalize pixel values to [0, 1]
     X_train = X_train.astype('float32') / 255.0
@@ -31,8 +50,7 @@ def load_cifar100():
     return (X_train, y_train), (X_test, y_test)
 
 
-#def partition_data_dirichlet(X, y, num_clients=50, alpha=0.5, num_classes=100, seed=42):
-def partition_data_dirichlet(X, y, num_clients=50, alpha=0.5, num_classes=10, seed=42):
+def partition_data_dirichlet(X, y, num_clients=50, alpha=0.5, num_classes=100, seed=42):
     """
     Partition data using Dirichlet distribution for non-IID split.
 
@@ -97,7 +115,7 @@ def partition_data_dirichlet(X, y, num_clients=50, alpha=0.5, num_classes=10, se
     return client_data
 
 # mudança de 100 para 10 classe pro cifar10
-def get_data_statistics(client_data, num_classes=10):
+def get_data_statistics(client_data, num_classes=100):
     """
     Compute statistics about data distribution across clients.
 
@@ -135,9 +153,9 @@ def get_data_statistics(client_data, num_classes=10):
     return stats
 
 
-def load_cifar100_noniid(num_clients=50, alpha=0.5, seed=42):
+def load_dataset_noniid(dataset = 'cifar10', num_clients=50, alpha=0.5, seed=42, num_classes=100):
     """
-    Load CIFAR-100 with Dirichlet non-IID partitioning.
+    Load Dataset (CIFAR10, CIFAR100 or fashion_mnist) with Dirichlet non-IID partitioning.
 
     Args:
         num_clients: Number of clients
@@ -149,22 +167,27 @@ def load_cifar100_noniid(num_clients=50, alpha=0.5, seed=42):
         test_data: Tuple (X_test, y_test)
         stats: Data distribution statistics
     """
-    print(f"Loading CIFAR-100 with Dirichlet(α={alpha}) non-IID partitioning...")
+    print(f"Loading dataset {dataset} with Dirichlet(α={alpha}) non-IID partitioning...")
     print(f"Number of clients: {num_clients}")
 
     # Load data
-    (X_train, y_train), (X_test, y_test) = load_cifar100()
-
+    try:
+        (X_train, y_train), (X_test, y_test) = load_dataset(dataset)
+    
+    except Exception as e:
+        raise ValueError(f"Failed to load dataset {dataset}: {e}")
+    
     # Partition data
     client_data = partition_data_dirichlet(
         X_train, y_train,
         num_clients=num_clients,
         alpha=alpha,
-        seed=seed
+        seed=seed,
+        num_classes=num_classes
     )
 
     # Get statistics
-    stats = get_data_statistics(client_data)
+    stats = get_data_statistics(client_data, num_classes=num_classes)
 
     print(f"\nData Statistics:")
     print(f"  Total training samples: {stats['total_samples']}")
@@ -232,7 +255,7 @@ def create_tf_datasets(client_data_dict, batch_size=32, augment=True):
 
 if __name__ == "__main__":
     # Test data loading and partitioning
-    client_data, test_data, stats = load_cifar100_noniid(num_clients=50, alpha=0.5)
+    client_data, test_data, stats = load_dataset_noniid(num_clients=50, alpha=0.5)
 
     print(f"\nTest set size: {len(test_data[1])}")
     print(f"\nExample client (ID=0):")

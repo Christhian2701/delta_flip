@@ -22,7 +22,7 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
 from model import build_cnn, compile_model
-from data import create_tf_datasets, load_cifar100_noniid
+from data import create_tf_datasets, load_dataset_noniid
 from client import FLIPSClient
 from server import FLIPSServer
 from simulation import run_federated_learning
@@ -111,23 +111,44 @@ def main(args):
             print(e)
 
     # Load data ONCE so partitions are identical for comparison
+    run_config = base_config.copy()
+
+    # Determine input shape based on dataset
+    
+    if run_config['dataset'] == 'cifar10' or run_config['dataset'] == 'cifar100':
+
+        model_input_shape = (32, 32, 3)
+
+        if run_config['dataset'] == 'cifar10':
+            num_classes = 10
+        else:
+            num_classes = 100
+
+    elif run_config['dataset'] == 'fashion_mnist':
+
+        #model_input_shape = (28, 28, 1)
+        #shape is kept the same as CIFAR as the dataset is padded to be like it to avoid model changes
+        model_input_shape = (32, 32, 3)
+
+        num_classes = 10
+    else:
+        raise ValueError(f"Unknown dataset: {run_config['dataset']}")
+
     print("\nLoading and partitioning data (Shared across algorithms)...")
 
-    raw_client_data, test_data, stats = load_cifar100_noniid(
-        num_clients=base_config['num_clients'],
-        alpha=base_config['alpha_dirichlet'],
-        seed=base_config['random_seed']
-    )
+    raw_client_data, test_data, stats = load_dataset_noniid(run_config['dataset'], num_clients=run_config['num_clients'], alpha=run_config['alpha_dirichlet'], seed=run_config['random_seed'], num_classes=num_classes)
 
-    tf_client_datasets = create_tf_datasets(raw_client_data, batch_size=32, augment=True)
+    tf_client_datasets = create_tf_datasets(raw_client_data, batch_size=run_config['batch_size'], augment=True)
     
     # Init Results Storage
     results = {}
+
+    
     
     # Define algorithms to run
     # Comparison: FLIPS vs FedAvg vs FedBuff vs FedProx vs FedLama
-    algorithms = ['flips', 'fedavg', 'fedbuff', 'fedprox', 'fedlama']
-    #algorithms = ['flips', 'fedavg']
+    #algorithms = ['flips', 'fedavg', 'fedbuff', 'fedprox', 'fedlama']
+    algorithms = ['fedavg']
     
     for algo in algorithms:
         print(f"\n" + "#" * 60)
@@ -139,8 +160,12 @@ def main(args):
         run_config['algorithm'] = algo
         
         # Re-initialize model (clean slate)
+        
+            
         print(f"Building fresh model for {algo}...")
-        model = build_cnn()
+
+        model = build_cnn(num_classes=num_classes, input_shape=model_input_shape)
+
         model = compile_model(model, learning_rate=run_config['learning_rate'])
         
         # Re-initialize clients with same data

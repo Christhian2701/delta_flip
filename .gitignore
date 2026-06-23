@@ -16,3 +16,6 @@ libdevice.10.bc
 # Additional folders
 result_stash/
 res_stash
+
+# Models
+vgg_*

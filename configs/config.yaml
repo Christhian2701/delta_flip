@@ -1,10 +1,10 @@
 # FLIPS Configuration
 
 # Federated Learning
-num_clients: 5 #100
-clients_per_round: 4
-num_rounds: 10
-local_epochs: 5
+num_clients: 2 #100
+clients_per_round: 1
+num_rounds: 2
+local_epochs: 1
 batch_size: 32
 learning_rate: 0.01
 server_momentum: 0.9 # nova abordagem -  serve para diminuir o drift vindo das atualizações locais ao "manter uma aceleração na direção pré-estabelecida"
@@ -12,6 +12,14 @@ server_momentum: 0.9 # nova abordagem -  serve para diminuir o drift vindo das a
 # Data
 dataset: cifar100
 alpha_dirichlet: 0.5
+
+# dataset definitions, assumes CIFAR100
+# elected to not use and use code to key among
+# supported datasets, namely CIFAR10, 100 and fashion_mnist
+#num_classes: 100
+#input_shape: [32, 32, 3]
+#use_data_augmentation: true
+#fashion_mnist_image_shape: [28, 28, 1]
 
 # SHAP
 shap_samples: 100  # Number of samples for SHAP computation (Eq 241)

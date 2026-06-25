@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 import json
 from pathlib import Path
 from datetime import datetime
+from sklearn.metrics import confusion_matrix
 
 #avoiding log clutter from tensorflow with gpu
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
@@ -71,6 +72,89 @@ def plot_results(server, output_path='results/plots'):
     plt.savefig(os.path.join(output_path, 'training_curves.png'), dpi=150)
     print(f"Plots saved to {output_path}/training_curves.png")
     plt.close()
+
+
+def build_confusion_matrix_payload(model, test_data, dataset_name, num_classes, algorithm, round_num):
+    """Build the final-round confusion matrix payload for one algorithm."""
+    X_test, y_test = test_data
+    y_pred = np.argmax(model.predict(X_test, verbose=0), axis=1)
+    labels = list(range(num_classes))
+    matrix = confusion_matrix(y_test, y_pred, labels=labels)
+
+    return {
+        'algorithm': algorithm,
+        'round': round_num,
+        'dataset': dataset_name,
+        'labels': labels,
+        'confusion_matrix': matrix.tolist(),
+    }
+
+
+def convert_numpy(obj):
+    """Convert numpy objects into JSON-serializable Python types."""
+    if isinstance(obj, np.integer):
+        return int(obj)
+    elif isinstance(obj, np.floating):
+        return float(obj)
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    return obj
+
+
+def resolve_output_path(results_dir, filename):
+    """Avoid overwriting existing result files by appending a numeric suffix."""
+    candidate = results_dir / filename
+    if not candidate.exists():
+        return candidate
+
+    stem = candidate.stem
+    suffix = candidate.suffix
+    counter = 2
+
+    while True:
+        next_candidate = results_dir / f"{stem}_{counter}{suffix}"
+        if not next_candidate.exists():
+            return next_candidate
+        counter += 1
+
+
+def save_json(payload, output_path):
+    """Write one JSON payload using the project numpy serializer."""
+    with open(output_path, "w") as f:
+        json.dump(payload, f, indent=4, default=convert_numpy)
+
+
+def save_algorithm_results(results_dir, algorithm, metrics, confusion_payload=None, finished_at=None):
+    """Persist one algorithm's completed outputs immediately after it finishes."""
+    finished_at = finished_at or datetime.now()
+    timestamp_suffix = finished_at.strftime("%d%m_%H")
+
+    metrics_name = f"metrics_{algorithm}_{timestamp_suffix}.json"
+    metrics_path = resolve_output_path(results_dir, metrics_name)
+    save_json({algorithm: metrics}, metrics_path)
+    print(f"Saved partial metrics to {metrics_path}")
+
+    if confusion_payload is None:
+        return
+
+    confusion_name = f"confusion_matrix_{algorithm}_{timestamp_suffix}.json"
+    confusion_path = resolve_output_path(results_dir, confusion_name)
+    save_json(confusion_payload, confusion_path)
+    print(f"Saved partial confusion matrix to {confusion_path}")
+
+
+def save_combined_results(results_dir, results, confusion_payloads):
+    """Persist the full post-run consolidated outputs."""
+    out_file = results_dir / "metrics_with_delta.json"
+    save_json(results, out_file)
+    print(f"Saved comparative metrics to {out_file}")
+
+    single_algorithm = len(confusion_payloads) == 1
+    for algo, payload in confusion_payloads.items():
+        filename = "final_confusion_matrix.json" if single_algorithm else f"final_confusion_matrix_{algo}.json"
+        matrix_file = results_dir / filename
+        save_json(payload, matrix_file)
+        print(f"Saved final confusion matrix to {matrix_file}")
 
 
 def main(args):
@@ -139,9 +223,12 @@ def main(args):
     raw_client_data, test_data, stats = load_dataset_noniid(run_config['dataset'], num_clients=run_config['num_clients'], alpha=run_config['alpha_dirichlet'], seed=run_config['random_seed'], num_classes=num_classes)
 
     tf_client_datasets = create_tf_datasets(raw_client_data, batch_size=run_config['batch_size'], augment=True)
+    results_dir = Path("new_results")
+    results_dir.mkdir(exist_ok=True)
     
     # Init Results Storage
     results = {}
+    confusion_payloads = {}
 
     
     
@@ -184,31 +271,32 @@ def main(args):
         
         # Store metrics
         results[algo] = server.round_metrics
+        confusion_payload = None
+
+        if server.round_metrics:
+            confusion_payload = build_confusion_matrix_payload(
+                server.global_model,
+                test_data,
+                run_config['dataset'],
+                num_classes,
+                algo,
+                server.round_metrics[-1]['round'],
+            )
+            confusion_payloads[algo] = confusion_payload
+
+        save_algorithm_results(
+            results_dir,
+            algo,
+            server.round_metrics,
+            confusion_payload=confusion_payload,
+            finished_at=datetime.now(),
+        )
         
     print(f"\n{'='*60}")
     print("ALL EXPERIMENTS COMPLETED")
     print(f"{'='*60}")
     
-    # Save results
-    results_dir = Path("new_results")
-    results_dir.mkdir(exist_ok=True)
-    
-    out_file = results_dir / "metrics_with_delta.json"
-    
-    # Convert numpy types to native python for JSON serialization
-    def convert_numpy(obj):
-        if isinstance(obj, np.integer):
-            return int(obj)
-        elif isinstance(obj, np.floating):
-            return float(obj)
-        elif isinstance(obj, np.ndarray):
-            return obj.tolist()
-        return obj
-
-    with open(out_file, "w") as f:
-        # Custom dumper handling
-        json.dump(results, f, indent=4, default=convert_numpy)
-        print(f"Saved comparative metrics to {out_file}")
+    save_combined_results(results_dir, results, confusion_payloads)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Run FLIPS experiments')

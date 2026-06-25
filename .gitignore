@@ -19,3 +19,7 @@ res_stash
 
 # Models
 vgg_*
+
+# additional files
+paper.txt
+system_*

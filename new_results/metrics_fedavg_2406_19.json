@@ -1,0 +1,55 @@
+{
+    "fedavg": [
+        {
+            "round": 0,
+            "test_accuracy": 0.38260000944137573,
+            "test_loss": 2.9933111667633057,
+            "num_selected_clients": 1,
+            "avg_compression_bytes": 39047720.0,
+            "avg_local_accuracy": 0.5629595518112183,
+            "avg_local_loss": 2.2080936431884766,
+            "delta_accuracy": 0.10000000149011612,
+            "delta_loss": 4.94264554977417,
+            "f1_macro": 0.3257310325704479,
+            "f1_weighted": 0.3257310325704479,
+            "precision_macro": 0.33636680797495233,
+            "precision_weighted": 0.3363668079749524,
+            "recall_macro": 0.3826,
+            "recall_weighted": 0.3826
+        },
+        {
+            "round": 1,
+            "test_accuracy": 0.16130000352859497,
+            "test_loss": 14.363866806030273,
+            "num_selected_clients": 1,
+            "avg_compression_bytes": 39047720.0,
+            "avg_local_accuracy": 0.6013327240943909,
+            "avg_local_loss": 1.8864669799804688,
+            "delta_accuracy": 0.31130000948905945,
+            "delta_loss": 3.2289557456970215,
+            "f1_macro": 0.09242262346643025,
+            "f1_weighted": 0.09242262346643025,
+            "precision_macro": 0.19614076118279064,
+            "precision_weighted": 0.19614076118279064,
+            "recall_macro": 0.1613,
+            "recall_weighted": 0.1613
+        },
+        {
+            "round": 2,
+            "test_accuracy": 0.16329999268054962,
+            "test_loss": 22.93218421936035,
+            "num_selected_clients": 1,
+            "avg_compression_bytes": 39047720.0,
+            "avg_local_accuracy": 0.6493566036224365,
+            "avg_local_loss": 1.7490423917770386,
+            "delta_accuracy": 0.18520000576972961,
+            "delta_loss": 4.7676591873168945,
+            "f1_macro": 0.08212265151640541,
+            "f1_weighted": 0.08212265151640541,
+            "precision_macro": 0.0998435997140811,
+            "precision_weighted": 0.0998435997140811,
+            "recall_macro": 0.16329999999999997,
+            "recall_weighted": 0.1633
+        }
+    ]
+}

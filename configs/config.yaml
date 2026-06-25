@@ -3,14 +3,14 @@
 # Federated Learning
 num_clients: 2 #100
 clients_per_round: 1
-num_rounds: 2
+num_rounds: 3
 local_epochs: 1
 batch_size: 32
 learning_rate: 0.01
 server_momentum: 0.9 # nova abordagem -  serve para diminuir o drift vindo das atualizações locais ao "manter uma aceleração na direção pré-estabelecida"
 
 # Data
-dataset: cifar100
+dataset: cifar10
 alpha_dirichlet: 0.5
 
 # dataset definitions, assumes CIFAR100

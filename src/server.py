@@ -15,6 +15,7 @@ import pickle
 import os
 import csv
 import math
+from sklearn.metrics import f1_score, precision_score, recall_score
 
 from tensorflow import keras
 
@@ -66,6 +67,18 @@ class FLIPSServer:
         
         # Initialize Aggregator Strategy
         self.aggregator = self._get_aggregator()
+
+    @staticmethod
+    def _compute_classification_metrics(y_true, y_pred):
+        """Compute round-level multiclass classification metrics."""
+        return {
+            'f1_macro': float(f1_score(y_true, y_pred, average='macro', zero_division=0)),
+            'f1_weighted': float(f1_score(y_true, y_pred, average='weighted', zero_division=0)),
+            'precision_macro': float(precision_score(y_true, y_pred, average='macro', zero_division=0)),
+            'precision_weighted': float(precision_score(y_true, y_pred, average='weighted', zero_division=0)),
+            'recall_macro': float(recall_score(y_true, y_pred, average='macro', zero_division=0)),
+            'recall_weighted': float(recall_score(y_true, y_pred, average='weighted', zero_division=0)),
+        }
 
     @staticmethod #tentando rodar passar lr_decay pro client
     def get_cosine_lr(current_round, max_rounds, lr_max=0.01, lr_min=0.001):
@@ -237,13 +250,21 @@ class FLIPSServer:
         test_loss, test_accuracy = self.global_model.evaluate(
             X_test, y_test, verbose=0
         )
+        global_predictions = self.global_model.predict(X_test, verbose=0)
+        y_pred = np.argmax(global_predictions, axis=1)
+        classification_metrics = self._compute_classification_metrics(y_test, y_pred)
+
         # Evaluate delta
         delta_loss, delta_accuracy = self.delta_model.evaluate(
             X_test, y_test, verbose=0
         )
-        
 
-
+        total_selected_samples = sum(c.num_samples for c in selected_clients)
+        avg_local_loss = 0.0
+        if total_selected_samples > 0:
+            avg_local_loss = sum(
+                c.local_loss * c.num_samples for c in selected_clients
+            ) / total_selected_samples
 
         # Collect metrics
         metrics = {
@@ -253,9 +274,11 @@ class FLIPSServer:
             'num_selected_clients': len(selected_clients),
             'avg_compression_bytes': total_compressed_size / len(selected_clients),
             'avg_local_accuracy': float(np.mean([c.local_accuracy for c in selected_clients])),
+            'avg_local_loss': float(avg_local_loss),
             'delta_accuracy': float(delta_accuracy),
-            'delta_loss': float(delta_loss)
+            'delta_loss': float(delta_loss),
         }
+        metrics.update(classification_metrics)
 
         self.round_metrics.append(metrics)
 

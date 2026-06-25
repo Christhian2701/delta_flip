@@ -23,3 +23,6 @@ vgg_*
 # additional files
 paper.txt
 system_*
+new_results/confusion_*
+new_results/final_*
+new_results/metrics_*
